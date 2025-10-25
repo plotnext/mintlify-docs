@@ -1,0 +1,76 @@
+---
+title: "RBAC Overview"
+description: "Introduction to the Role-Based Access Control system"
+icon: "shield-check"
+---
+
+## Overview
+
+The Role-Based Access Control (RBAC) system provides fine-grained authorization for the Arali platform. It currently implements a two-role system (Administrator and Member) with scoped permissions that can be applied at both enterprise-wide and organizational unit levels.
+
+<Info>
+**Key Principle**: The system checks **permissions**, not **roles**. Always verify specific permissions rather than role membership for authorization decisions.
+</Info>
+
+## Architecture
+
+The RBAC system consists of several key components:
+
+<CardGroup cols={2}>
+<Card title="Roles" icon="users">
+  Hierarchical roles with priority-based ordering
+</Card>
+
+<Card title="Permissions" icon="key">
+  Resource-action pairs defining what can be done
+</Card>
+
+<Card title="Scoped Access" icon="building">
+  Enterprise-wide and org-unit specific permissions
+</Card>
+
+<Card title="User Assignments" icon="user-check">
+  Role assignments with organizational scope
+</Card>
+</CardGroup>
+
+## Key Concepts
+
+### Permission-Based Authorization
+
+Unlike traditional role-based systems, Arali's RBAC system focuses on **permissions** rather than roles. This means:
+
+- Users are granted specific permissions through their roles
+- Authorization checks verify permissions, not role membership
+- This provides more granular control and flexibility
+
+### Scoped Access Control
+
+Permissions can be scoped at two levels:
+
+- **Enterprise-wide**: Access across the entire organization
+- **Org-unit specific**: Access limited to specific organizational units
+
+### Role Hierarchy
+
+Roles are organized by priority, with higher-priority roles able to assign lower-priority roles to users.
+
+## Related Documentation
+
+<CardGroup cols={2}>
+<Card title="Role Hierarchy" icon="users" href="/rbac-roles">
+  Detailed breakdown of available roles and their permissions
+</Card>
+
+<Card title="Permission Matrix" icon="key" href="/rbac-permissions">
+  Complete list of resources and actions
+</Card>
+
+<Card title="API Integration" icon="code" href="/rbac-api">
+  How to integrate RBAC with your applications
+</Card>
+
+<Card title="Best Practices" icon="check-circle" href="/rbac-best-practices">
+  Guidelines for implementing RBAC effectively
+</Card>
+</CardGroup>

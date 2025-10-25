@@ -1,0 +1,421 @@
+---
+title: "Invite User"
+api: "POST /api/v1/auth/invite"
+description: "Send an invitation to join your enterprise"
+icon: "envelope"
+---
+
+## Overview
+
+Invite a user to join your enterprise by sending them an email invitation with auto-generated credentials. The invitation includes a unique link that allows the recipient to accept and join your organization with pre-assigned roles and organizational units.
+
+## Authentication
+
+<Warning>
+This endpoint requires authentication. Include your JWT token in the request.
+</Warning>
+
+Provide authentication via:
+- **Authorization header**: `Authorization: Bearer YOUR_TOKEN`
+- **Cookie**: `auth_token` (automatically included in browser requests)
+
+## Request Body
+
+<ParamField body="email" type="string" required>
+  Email address of the person to invite. Will be normalized (trimmed and lowercased).
+  
+  **Example**: `"jane@example.com"`
+</ParamField>
+
+<ParamField body="name" type="string">
+  Full name of the person being invited. If not provided, defaults to the part before @ in the email.
+  
+  **Example**: `"Jane Smith"`
+</ParamField>
+
+<ParamField body="phone" type="string">
+  Phone number for the invited user. If not provided, a temporary placeholder is generated.
+  
+  **Example**: `"+1987654321"`
+</ParamField>
+
+<ParamField body="enterpriseId" type="string">
+  Specific enterprise to invite the user to. If not provided, uses the authenticated user's current enterprise.
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"`
+</ParamField>
+
+<ParamField body="roleIds" type="array">
+  Array of role IDs to assign to the invited user.
+  
+  **Example**: `["role-id-1", "role-id-2"]`
+</ParamField>
+
+<ParamField body="roleKeys" type="array">
+  Array of role keys to assign (alternative to roleIds). Automatically resolved to system role IDs.
+  
+  **Valid keys**: `"owner"`, `"admin"`, `"member"`
+  
+  **Example**: `["member"]`
+  
+  **Default**: `["member"]` (if no roles specified)
+</ParamField>
+
+<ParamField body="orgUnitIds" type="array">
+  Array of organizational unit IDs to assign the invited user to. Must belong to the specified enterprise.
+  
+  **Example**: `["org-unit-1", "org-unit-2"]`
+</ParamField>
+
+<ParamField body="redirectPath" type="string">
+  Path to redirect the user to after accepting the invitation.
+  
+  **Example**: `"/onboarding"`
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">
+  Invitation status: `"invite_created"`
+</ResponseField>
+
+<ResponseField name="delivery" type="string">
+  Email delivery status: `"sent"` or `"failed"`
+</ResponseField>
+
+<ResponseField name="reason" type="string">
+  Error reason when delivery fails
+</ResponseField>
+
+## Examples
+
+### Basic Invitation
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/auth/invite' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -d '{
+    "email": "jane@example.com",
+    "name": "Jane Smith"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/auth/invite', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    email: 'jane@example.com',
+    name: 'Jane Smith'
+  })
+});
+
+const data = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.post(
+  'http://localhost:3001/api/v1/auth/invite',
+  headers={
+    'Authorization': f'Bearer {token}'
+  },
+  json={
+    'email': 'jane@example.com',
+    'name': 'Jane Smith'
+  }
+)
+
+data = response.json()
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "status": "invite_created",
+  "delivery": "sent"
+}
+```
+
+```json Delivery Failed
+{
+  "status": "invite_created",
+  "delivery": "failed",
+  "reason": "Invalid recipient email address"
+}
+```
+</ResponseExample>
+
+### Invitation with Roles and Org Units
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/auth/invite' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -d '{
+    "email": "jane@example.com",
+    "name": "Jane Smith",
+    "phone": "+1987654321",
+    "roleKeys": ["admin"],
+    "orgUnitIds": ["550e8400-e29b-41d4-a716-446655440000"],
+    "redirectPath": "/dashboard"
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "status": "invite_created",
+  "delivery": "sent"
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Unauthorized">
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+Missing or invalid authentication token.
+</Accordion>
+
+<Accordion title="400 - Missing Email">
+```json
+{
+  "error": "Missing email"
+}
+```
+</Accordion>
+
+<Accordion title="400 - Org Units Mismatch">
+```json
+{
+  "error": "Org units do not belong to the specified enterprise"
+}
+```
+
+One or more specified org units don't belong to the enterprise.
+</Accordion>
+
+<Accordion title="404 - Org Unit Not Found">
+```json
+{
+  "error": "One or more org units not found"
+}
+```
+
+Some specified org unit IDs don't exist.
+</Accordion>
+
+<Accordion title="404 - Enterprise Not Found">
+```json
+{
+  "error": "No enterprise available"
+}
+```
+
+No valid enterprise found for the invitation.
+</Accordion>
+
+<Accordion title="500 - Unable to Create User">
+```json
+{
+  "error": "Unable to create invitee"
+}
+```
+
+Failed to create or retrieve user record.
+</Accordion>
+</AccordionGroup>
+
+## Invitation Email
+
+The invited user receives an email with:
+
+1. **Subject**: "You're invited to join [Enterprise Name]"
+2. **Acceptance link**: Valid for 48 hours
+3. **Auto-generated credentials**:
+   - Email: The email address they were invited with
+   - Password: A memorable string (e.g., "BrightTiger", "QuickEagle")
+
+<Note>
+The auto-generated password is a combination of an adjective and an animal (e.g., "BrightTiger", "QuickEagle", "HappyLion") for easy memorization.
+</Note>
+
+### Email Template
+
+```
+Hi [Name],
+
+You've been invited to join [Enterprise Name] on Arali.
+
+Click this link to accept the invitation:
+[Acceptance URL]
+
+This invitation expires in 48 hours.
+
+Your credentials are:
+Email: [email]
+Password: [auto-generated password]
+
+If you weren't expecting this invitation, you can safely ignore this email.
+
+---
+Sent by [Enterprise Name] via Arali
+```
+
+## Invitation Flow
+
+<Steps>
+<Step title="Check Existing User">
+  System checks if a user with the email already exists. If yes, uses existing user; if no, creates new user with provider set to `"invite"`.
+</Step>
+
+<Step title="Generate Credentials">
+  For new users, generates a memorable password (e.g., "BrightTiger") and hashes it for secure storage.
+</Step>
+
+<Step title="Create Invitation Token">
+  Generates a magic token with:
+  - Purpose: `"invite"`
+  - Validity: 48 hours
+  - Embedded data: user ID, enterprise ID, roles, org units, redirect path
+</Step>
+
+<Step title="Store Verification Code">
+  Saves the hashed token in `email_verification_codes` table for validation.
+</Step>
+
+<Step title="Send Email">
+  Sends invitation email with acceptance link and credentials.
+</Step>
+</Steps>
+
+## After Invitation Acceptance
+
+When the invited user clicks the acceptance link, they are:
+
+1. **Authenticated**: Automatically logged into the system
+2. **Assigned to Enterprise**: Added to the specified enterprise
+3. **Assigned Roles**: Given the roles specified in the invitation
+4. **Assigned to Org Units**: Added to the specified organizational units
+5. **Redirected**: Sent to the redirect path (if specified) or default dashboard
+
+## Role Assignment
+
+Roles can be specified in two ways:
+
+### Using Role Keys (Recommended)
+
+```json
+{
+  "roleKeys": ["admin", "member"]
+}
+```
+
+System roles:
+- `owner` - Full enterprise access
+- `admin` - Administrative access
+- `member` - Basic member access
+
+### Using Role IDs
+
+```json
+{
+  "roleIds": ["550e8400-e29b-41d4-a716-446655440000"]
+}
+```
+
+<Tip>
+If no roles are specified, the user is automatically assigned the **Member** role.
+</Tip>
+
+## Org Unit Assignment
+
+Organizational units must:
+- Exist in the database
+- Belong to the same enterprise as the invitation
+- Be valid UUID format
+
+```json
+{
+  "orgUnitIds": [
+    "550e8400-e29b-41d4-a716-446655440000",
+    "660e8400-e29b-41d4-a716-446655440001"
+  ]
+}
+```
+
+## Invitation Expiration
+
+<Warning>
+Invitation links expire after **48 hours**. After expiration, users must request a new invitation.
+</Warning>
+
+## Re-inviting Existing Users
+
+If you invite a user who already has an account:
+- Their existing account is used
+- New roles and org units are assigned via the invitation acceptance flow
+- They receive the invitation email with a new acceptance link
+- Their existing password is **not** changed
+
+## Security Considerations
+
+<Check>
+**Token Security**: Invitation tokens are cryptographically signed and time-limited
+</Check>
+
+<Check>
+**Password Generation**: Auto-generated passwords are random but memorable
+</Check>
+
+<Check>
+**Email Verification**: Tokens are stored as hashes in the database
+</Check>
+
+<Check>
+**Enterprise Isolation**: Users can only be invited to enterprises where the inviter has permissions
+</Check>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Accept Invitation" icon="check" href="/api-reference/auth/invite-accept">
+  Accept an invitation (GET endpoint, used via email link)
+</Card>
+
+<Card title="Register" icon="user-plus" href="/api-reference/auth/register">
+  Alternative: Users can self-register
+</Card>
+
+<Card title="List Users" icon="users" href="/api-reference/users/list">
+  View all users in your enterprise
+</Card>
+</CardGroup>
+
+
+
+
+
+

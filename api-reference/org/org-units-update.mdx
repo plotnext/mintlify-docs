@@ -1,0 +1,718 @@
+---
+title: "Update Organizational Unit"
+api: "PATCH /api/v1/org-units/{id}"
+description: "Update an organizational unit's name, type, or parent relationship"
+icon: "pen-to-square"
+---
+
+## Overview
+
+Update an existing organizational unit's properties, including moving it within the organizational hierarchy by changing its parent. This endpoint allows you to reorganize your org structure dynamically.
+
+When updating the parent relationship, the system automatically maintains the closure table to ensure all descendant relationships remain correct.
+
+## Authentication
+
+<Warning>
+This endpoint requires authentication. Include your JWT token in the request.
+</Warning>
+
+Provide authentication via:
+- **Authorization header**: `Authorization: Bearer YOUR_TOKEN`
+- **Cookie**: `auth_token` (automatically included in browser requests)
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The ID of the organizational unit to update (UUID)
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"`
+</ParamField>
+
+## Request Body
+
+All fields are optional. Only include fields you want to update.
+
+<ParamField body="name" type="string">
+  New name for the organizational unit. Must be at least 1 character (after trimming).
+  
+  **Example**: `"Sales EMEA"`, `"Engineering Team"`
+</ParamField>
+
+<ParamField body="type" type="string">
+  New type for the organizational unit
+  
+  **Options**: `"sales"`, `"cs"`, `"onboarding"`, `"exec"`
+</ParamField>
+
+<ParamField body="parentId" type="string | null">
+  New parent organizational unit ID. Set to `null` to make this a root-level org unit.
+  
+  **Format**: UUID or `null`
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"` or `null`
+  
+  <Warning>
+  The system prevents circular references. You cannot set a parent to be one of the unit's descendants.
+  </Warning>
+</ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">
+  Success message: `"Org unit updated successfully"`
+</ResponseField>
+
+<ResponseField name="orgUnit" type="object">
+  Updated organizational unit object
+  
+  <Expandable title="Org Unit Object">
+    <ResponseField name="id" type="string">
+      Org unit unique identifier (UUID)
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Updated org unit name
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Updated org unit type
+    </ResponseField>
+    
+    <ResponseField name="parentId" type="string | null">
+      Updated parent org unit ID (null if root level)
+    </ResponseField>
+    
+    <ResponseField name="enterpriseId" type="string">
+      Enterprise ID (unchanged)
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      Original creation timestamp (ISO 8601)
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      Last update timestamp (ISO 8601)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Update Org Unit Name
+
+<RequestExample>
+```bash cURL
+curl -X PATCH 'http://localhost:3001/api/v1/org-units/org-unit-abc123' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -d '{
+    "name": "Sales EMEA Region"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/org-units/org-unit-abc123', {
+  method: 'PATCH',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    name: 'Sales EMEA Region'
+  })
+});
+
+const data = await response.json();
+console.log('Updated:', data.orgUnit.name);
+```
+
+```python Python
+import requests
+
+response = requests.patch(
+  'http://localhost:3001/api/v1/org-units/org-unit-abc123',
+  headers={
+    'Authorization': f'Bearer {token}',
+    'Content-Type': 'application/json'
+  },
+  json={
+    'name': 'Sales EMEA Region'
+  }
+)
+
+data = response.json()
+print(f"Updated: {data['orgUnit']['name']}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success (200 OK)
+{
+  "message": "Org unit updated successfully",
+  "orgUnit": {
+    "id": "org-unit-abc123",
+    "name": "Sales EMEA Region",
+    "type": "sales",
+    "parentId": "sales-dept-id",
+    "enterpriseId": "550e8400-e29b-41d4-a716-446655440000",
+    "createdAt": "2024-03-15T10:30:00Z",
+    "updatedAt": "2024-03-15T14:20:00Z"
+  }
+}
+```
+</ResponseExample>
+
+### Change Parent (Move Org Unit)
+
+Move an org unit to a different parent in the hierarchy.
+
+<RequestExample>
+```bash cURL
+curl -X PATCH 'http://localhost:3001/api/v1/org-units/sales-uk-id' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -d '{
+    "parentId": "sales-emea-id"
+  }'
+```
+
+```javascript JavaScript
+// Move "Sales UK" from "Sales" to "Sales EMEA"
+const response = await fetch('/api/v1/org-units/sales-uk-id', {
+  method: 'PATCH',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    parentId: 'sales-emea-id'
+  })
+});
+
+const data = await response.json();
+console.log('Moved to new parent:', data.orgUnit.parentId);
+```
+
+```python Python
+import requests
+
+# Move "Sales UK" from "Sales" to "Sales EMEA"
+response = requests.patch(
+  'http://localhost:3001/api/v1/org-units/sales-uk-id',
+  headers={
+    'Authorization': f'Bearer {token}',
+    'Content-Type': 'application/json'
+  },
+  json={
+    'parentId': 'sales-emea-id'
+  }
+)
+
+data = response.json()
+print(f"Moved to new parent: {data['orgUnit']['parentId']}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Parent Updated
+{
+  "message": "Org unit updated successfully",
+  "orgUnit": {
+    "id": "sales-uk-id",
+    "name": "Sales UK",
+    "type": "sales",
+    "parentId": "sales-emea-id",
+    "enterpriseId": "550e8400-e29b-41d4-a716-446655440000",
+    "createdAt": "2024-03-10T09:00:00Z",
+    "updatedAt": "2024-03-15T14:25:00Z"
+  }
+}
+```
+</ResponseExample>
+
+### Make Org Unit a Root Unit
+
+Remove the parent to make an org unit root-level.
+
+<RequestExample>
+```bash cURL
+curl -X PATCH 'http://localhost:3001/api/v1/org-units/engineering-id' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -d '{
+    "parentId": null
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/org-units/engineering-id', {
+  method: 'PATCH',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    parentId: null
+  })
+});
+
+const data = await response.json();
+console.log('Now a root unit:', data.orgUnit.parentId === null);
+```
+
+```python Python
+import requests
+
+response = requests.patch(
+  'http://localhost:3001/api/v1/org-units/engineering-id',
+  headers={
+    'Authorization': f'Bearer {token}',
+    'Content-Type': 'application/json'
+  },
+  json={
+    'parentId': None
+  }
+)
+
+data = response.json()
+print(f"Now a root unit: {data['orgUnit']['parentId'] is None}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Now Root Unit
+{
+  "message": "Org unit updated successfully",
+  "orgUnit": {
+    "id": "engineering-id",
+    "name": "Engineering",
+    "type": "exec",
+    "parentId": null,
+    "enterpriseId": "550e8400-e29b-41d4-a716-446655440000",
+    "createdAt": "2024-03-01T08:00:00Z",
+    "updatedAt": "2024-03-15T14:30:00Z"
+  }
+}
+```
+</ResponseExample>
+
+### Update Multiple Fields
+
+<RequestExample>
+```javascript JavaScript
+// Update name, type, and parent simultaneously
+const response = await fetch('/api/v1/org-units/team-id', {
+  method: 'PATCH',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    name: 'Customer Success EMEA',
+    type: 'cs',
+    parentId: 'cs-dept-id'
+  })
+});
+
+const data = await response.json();
+```
+</RequestExample>
+
+<ResponseExample>
+```json Multiple Fields Updated
+{
+  "message": "Org unit updated successfully",
+  "orgUnit": {
+    "id": "team-id",
+    "name": "Customer Success EMEA",
+    "type": "cs",
+    "parentId": "cs-dept-id",
+    "enterpriseId": "550e8400-e29b-41d4-a716-446655440000",
+    "createdAt": "2024-02-20T10:00:00Z",
+    "updatedAt": "2024-03-15T14:35:00Z"
+  }
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Unauthorized">
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+Missing or invalid authentication token.
+</Accordion>
+
+<Accordion title="404 - Org Unit Not Found">
+```json
+{
+  "error": "Org unit not found or does not belong to your enterprise"
+}
+```
+
+The org unit with the specified ID:
+- Doesn't exist
+- Belongs to a different enterprise
+- Is not a valid UUID
+</Accordion>
+
+<Accordion title="404 - Parent Not Found">
+```json
+{
+  "error": "Parent org unit not found or does not belong to your enterprise"
+}
+```
+
+When updating `parentId`, the specified parent:
+- Doesn't exist in the database
+- Belongs to a different enterprise
+- Is not a valid UUID
+</Accordion>
+
+<Accordion title="400 - Invalid Name">
+```json
+{
+  "error": "Name must be a non-empty string"
+}
+```
+
+Provided name is empty or contains only whitespace.
+</Accordion>
+
+<Accordion title="400 - Invalid Type">
+```json
+{
+  "error": "Invalid type. Must be one of: sales, cs, onboarding, exec"
+}
+```
+
+Provided type is not one of the allowed values.
+</Accordion>
+
+<Accordion title="400 - Circular Reference">
+```json
+{
+  "error": "Cannot set parent to a descendant of this org unit (circular reference)"
+}
+```
+
+Attempting to set the parent to one of the unit's own descendants, which would create a circular reference.
+
+**Example**: Cannot make "Sales EMEA" the parent of "Sales" if "Sales EMEA" is already a child of "Sales".
+</Accordion>
+
+<Accordion title="400 - Self as Parent">
+```json
+{
+  "error": "Cannot set an org unit as its own parent"
+}
+```
+
+Attempting to set an org unit as its own parent.
+</Accordion>
+
+<Accordion title="500 - Internal Server Error">
+```json
+{
+  "error": "Internal server error"
+}
+```
+
+An unexpected error occurred while updating the org unit.
+</Accordion>
+</AccordionGroup>
+
+## Hierarchy Management
+
+### How Parent Updates Work
+
+When you change an org unit's parent:
+
+1. **Validation**: System checks for circular references and verifies the new parent exists
+2. **Closure Table Update**: All ancestor-descendant relationships are recalculated
+3. **Child Preservation**: Any children of the moved unit move with it
+4. **Database Update**: Both `org_unit` and `org_unit_closure` tables are updated atomically
+
+### Moving Subtrees
+
+When you move an org unit, all its descendants move with it:
+
+**Before**:
+```
+Sales (root)
+├── Sales EMEA
+│   └── Sales UK
+└── Sales APAC
+```
+
+**Update**: Move "Sales EMEA" under "Sales APAC"
+```javascript
+PATCH /api/v1/org-units/sales-emea-id
+{ "parentId": "sales-apac-id" }
+```
+
+**After**:
+```
+Sales (root)
+└── Sales APAC
+    └── Sales EMEA
+        └── Sales UK  ← Also moved automatically
+```
+
+<Info>
+All descendants of the moved org unit automatically update their ancestor relationships in the closure table.
+</Info>
+
+## Circular Reference Prevention
+
+The system prevents circular references by checking if the new parent is a descendant of the org unit being moved.
+
+### Invalid Examples
+
+<Warning>
+**Cannot do this**: Make "Sales" a child of "Sales EMEA" when "Sales EMEA" is already under "Sales"
+</Warning>
+
+```javascript
+// Current hierarchy:
+// Sales → Sales EMEA
+
+// This will FAIL with circular reference error:
+PATCH /api/v1/org-units/sales-id
+{ "parentId": "sales-emea-id" }
+```
+
+<Warning>
+**Cannot do this**: Set an org unit as its own parent
+</Warning>
+
+```javascript
+PATCH /api/v1/org-units/sales-id
+{ "parentId": "sales-id" }  // ❌ Error
+```
+
+### Valid Reorganization
+
+To reorganize without circular references:
+
+```javascript
+// Step 1: Move child to root level first
+PATCH /api/v1/org-units/sales-emea-id
+{ "parentId": null }
+
+// Step 2: Now you can reorganize as needed
+PATCH /api/v1/org-units/sales-id
+{ "parentId": "sales-emea-id" }
+```
+
+## Use Cases
+
+<AccordionGroup>
+<Accordion title="Reorganize Department Structure">
+```javascript
+// Move a team from one department to another
+async function moveTeam(teamId, newDepartmentId) {
+  const response = await fetch(`/api/v1/org-units/${teamId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      parentId: newDepartmentId
+    })
+  });
+  
+  return response.json();
+}
+
+// Example: Move "Implementation Team" from "Onboarding" to "Customer Success"
+await moveTeam('impl-team-id', 'cs-dept-id');
+```
+</Accordion>
+
+<Accordion title="Rename Department">
+```javascript
+// Update the name of an org unit
+async function renameDepartment(orgUnitId, newName) {
+  const response = await fetch(`/api/v1/org-units/${orgUnitId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      name: newName
+    })
+  });
+  
+  return response.json();
+}
+
+await renameDepartment('sales-emea-id', 'Sales Europe');
+```
+</Accordion>
+
+<Accordion title="Change Department Type">
+```javascript
+// Change the type of an org unit
+async function changeDepartmentType(orgUnitId, newType) {
+  const response = await fetch(`/api/v1/org-units/${orgUnitId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      type: newType
+    })
+  });
+  
+  return response.json();
+}
+
+// Convert a general team to a sales team
+await changeDepartmentType('team-id', 'sales');
+```
+</Accordion>
+
+<Accordion title="Flatten Hierarchy">
+```javascript
+// Make all child units root-level (flatten structure)
+async function flattenOrgStructure(parentId) {
+  // Get all children
+  const { orgUnits } = await fetch('/api/v1/org-units', {
+    headers: { 'Authorization': `Bearer ${token}` }
+  }).then(r => r.json());
+  
+  const children = orgUnits.filter(u => u.parentId === parentId);
+  
+  // Move each to root level
+  for (const child of children) {
+    await fetch(`/api/v1/org-units/${child.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ parentId: null })
+    });
+  }
+}
+```
+</Accordion>
+
+<Accordion title="Merge Departments">
+```javascript
+// Move all children from one department to another, then update the old dept
+async function mergeDepartments(fromDeptId, toDeptId) {
+  // Get all children of the "from" department
+  const { orgUnits } = await fetch('/api/v1/org-units', {
+    headers: { 'Authorization': `Bearer ${token}` }
+  }).then(r => r.json());
+  
+  const children = orgUnits.filter(u => u.parentId === fromDeptId);
+  
+  // Move each child to the "to" department
+  for (const child of children) {
+    await fetch(`/api/v1/org-units/${child.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ parentId: toDeptId })
+    });
+  }
+  
+  // Optionally delete or make the old department a root unit
+  await fetch(`/api/v1/org-units/${fromDeptId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ parentId: null })
+  });
+}
+
+// Merge "Old Sales Team" into "New Sales Team"
+await mergeDepartments('old-sales-id', 'new-sales-id');
+```
+</Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Check>
+**Validate before moving**: Check the current hierarchy to avoid unintended reorganizations
+</Check>
+
+<Check>
+**Update incrementally**: Make one change at a time for complex reorganizations
+</Check>
+
+<Check>
+**Communicate changes**: Notify users affected by org structure changes
+</Check>
+
+<Check>
+**Test on staging**: Test complex hierarchy changes in a non-production environment first
+</Check>
+
+<Warning>
+**Descendants move automatically**: Remember that moving an org unit also moves all its children and their descendants
+</Warning>
+
+<Tip>
+Use the `GET /api/v1/org-units` endpoint before making changes to understand the current structure and all descendants.
+</Tip>
+
+## Closure Table Management
+
+The closure table is automatically maintained when updating parent relationships:
+
+### For Parent Change
+1. **Delete**: Remove old ancestor paths for the unit and all descendants
+2. **Preserve**: Keep self-references (level 0) for all units
+3. **Insert**: Add new ancestor paths based on the new parent
+4. **Cascade**: Update all descendants to reflect new ancestor relationships
+
+<Note>
+The closure table enables efficient queries like "find all descendants" or "find all ancestors" without recursive queries. It's automatically managed—you don't need to handle it manually.
+</Note>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Get Org Unit" icon="eye" href="/api-reference/org/org-units-get">
+  Fetch a specific org unit by ID
+</Card>
+
+<Card title="List Org Units" icon="list" href="/api-reference/org/org-units-list">
+  View all organizational units
+</Card>
+
+<Card title="Create Org Unit" icon="plus" href="/api-reference/org/org-units-create">
+  Create a new organizational unit
+</Card>
+
+<Card title="List Users" icon="users" href="/api-reference/users/list">
+  See which users belong to org units
+</Card>
+</CardGroup>
+
+
+

@@ -1,0 +1,148 @@
+---
+title: "Role Hierarchy"
+description: "Complete breakdown of available roles and their permissions"
+icon: "users"
+---
+
+## Role Hierarchy
+
+### Active Roles
+
+<AccordionGroup>
+<Accordion title="Administrator (Priority: 500)">
+**Key**: `admin`  
+**Scope**: Enterprise-wide
+
+Full administrative access to the system:
+- Complete meeting management (CRUD)
+- Complete org unit management (CRUD)
+- Complete user management (CRUD)
+- Role viewing capabilities
+
+**Permissions**: 13/20 total permissions
+</Accordion>
+
+<Accordion title="Member (Priority: 100)">
+**Key**: `member`  
+**Scope**: Org-unit scoped
+
+Basic user access with limited management:
+- Meeting management (read, create, update - no delete)
+- Read access to org units
+- Read access to users in their org units
+- Scoped to assigned organizational units
+
+**Permissions**: 5/20 total permissions
+</Accordion>
+</AccordionGroup>
+
+### Inactive Roles
+
+<Info>
+The following roles exist in the database but are **not currently active** in the system:
+</Info>
+
+<AccordionGroup>
+<Accordion title="Owner (Priority: 1000)">
+**Key**: `owner`  
+**Status**: Reserved for future superadmin role
+
+This role is defined in the database but not used in the current implementation.
+</Accordion>
+
+<Accordion title="Manager (Priority: 300)">
+**Key**: `manager`  
+**Status**: Not used in current implementation
+
+This role is defined in the database but not used in the current implementation.
+</Accordion>
+</AccordionGroup>
+
+## Role Assignment Rules
+
+### Hierarchy Enforcement
+
+Users can only assign roles with **lower priority** than their own:
+
+```typescript
+function canAssignRole(userRolePriority: number, targetRolePriority: number): boolean {
+  // Users can only assign roles with lower priority
+  return userRolePriority > targetRolePriority;
+}
+
+// Example usage
+const currentUserRole = { priority: 500 }; // Admin
+const targetRole = { priority: 100 }; // Member
+
+if (canAssignRole(currentUserRole.priority, targetRole.priority)) {
+  console.log('User can assign this role');
+} else {
+  console.log('User cannot assign this role - insufficient priority');
+}
+```
+
+### Assignment Process
+
+1. **Check Role Priority**: Verify the assigning user has higher priority
+2. **Validate Enterprise Context**: Ensure both users are in the same enterprise
+3. **Set Scope**: Determine if role applies enterprise-wide or to specific org units
+4. **Create Assignment**: Record the role assignment in the database
+
+## Role Management API
+
+### Getting Available Roles
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/roles' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/roles', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+
+const data = await response.json();
+console.log('Available roles:', data.roles);
+```
+</RequestExample>
+
+### Assigning Roles to Users
+
+```typescript
+// Invite user with specific roles
+const inviteData = {
+  email: 'newuser@example.com',
+  name: 'New User',
+  roleKeys: ['admin', 'member'], // Can assign multiple roles
+  orgUnitIds: ['sales-team-id'] // Optional: scope to specific org units
+};
+
+const response = await fetch('/api/v1/auth/invite', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify(inviteData)
+});
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+<Card title="Permission Matrix" icon="key" href="/rbac-permissions">
+  See what permissions each role has
+</Card>
+
+<Card title="Role Assignment" icon="user-check" href="/rbac-assignment">
+  How to assign and manage user roles
+</Card>
+
+<Card title="API Reference" icon="code" href="/api-reference/org/roles">
+  Complete API documentation for role management
+</Card>
+</CardGroup>

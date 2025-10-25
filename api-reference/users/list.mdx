@@ -1,0 +1,473 @@
+---
+title: "List Users"
+api: "GET /api/v1/users"
+description: "Retrieve users filtered by enterprise and organizational units"
+icon: "users"
+---
+
+## Overview
+
+Fetch a list of users within your enterprise, optionally filtered by organizational units. This endpoint returns detailed user information including their roles, organizational unit assignments, and profile data.
+
+## Authentication
+
+<Warning>
+This endpoint requires authentication. Include your JWT token in the request.
+</Warning>
+
+Provide authentication via:
+- **Authorization header**: `Authorization: Bearer YOUR_TOKEN`
+- **Cookie**: `auth_token` (automatically included in browser requests)
+
+## Query Parameters
+
+<ParamField query="enterprise" type="string" required>
+  Enterprise ID to filter users by. If not provided, uses the authenticated user's current enterprise from their JWT token.
+  
+  **Example**: `550e8400-e29b-41d4-a716-446655440000`
+</ParamField>
+
+<ParamField query="enterprise_id" type="string">
+  Alternative parameter name for `enterprise`. Both are accepted.
+  
+  **Example**: `550e8400-e29b-41d4-a716-446655440000`
+</ParamField>
+
+<ParamField query="org_unit" type="string">
+  Comma-separated list of organizational unit IDs to filter users by. If provided, only users belonging to these org units are returned.
+  
+  **Example**: `"dept-1,dept-2,dept-3"`
+</ParamField>
+
+## Response
+
+<ResponseField name="users" type="array">
+  Array of user objects
+  
+  <Expandable title="User Object">
+    <ResponseField name="id" type="string">
+      User's unique identifier (UUID)
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      User's full name
+    </ResponseField>
+    
+    <ResponseField name="email" type="string">
+      User's email address
+    </ResponseField>
+    
+    <ResponseField name="phone" type="string | null">
+      User's phone number
+    </ResponseField>
+    
+    <ResponseField name="emailVerifiedAt" type="string | null">
+      Timestamp when email was verified (ISO 8601 format)
+    </ResponseField>
+    
+    <ResponseField name="provider" type="string | null">
+      Authentication provider: `"local"`, `"google"`, or `"invite"`
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string | null">
+      User creation timestamp (ISO 8601 format)
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string | null">
+      Last update timestamp (ISO 8601 format)
+    </ResponseField>
+    
+    <ResponseField name="roles" type="array">
+      Array of roles assigned to the user
+      
+      <Expandable title="Role Object">
+        <ResponseField name="id" type="string">
+          Role unique identifier
+        </ResponseField>
+        
+        <ResponseField name="name" type="string | null">
+          Role display name
+        </ResponseField>
+        
+        <ResponseField name="key" type="string | null">
+          Role key (e.g., "owner", "admin", "member")
+        </ResponseField>
+        
+        <ResponseField name="scopeType" type="string | null">
+          Scope of role assignment: `"enterprise"` or `"org_unit"`
+        </ResponseField>
+        
+        <ResponseField name="orgUnitId" type="string | null">
+          Org unit ID if role is scoped to an org unit
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="orgUnits" type="array">
+      Array of organizational units the user belongs to
+      
+      <Expandable title="Org Unit Object">
+        <ResponseField name="id" type="string">
+          Org unit unique identifier
+        </ResponseField>
+        
+        <ResponseField name="name" type="string | null">
+          Org unit display name
+        </ResponseField>
+        
+        <ResponseField name="type" type="string | null">
+          Org unit type: `"sales"`, `"cs"`, `"onboarding"`, `"exec"`
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="count" type="number">
+  Total number of users returned
+</ResponseField>
+
+## Examples
+
+### List All Enterprise Users
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/users?enterprise=550e8400-e29b-41d4-a716-446655440000' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```javascript JavaScript
+const response = await fetch(
+  '/api/v1/users?enterprise=550e8400-e29b-41d4-a716-446655440000',
+  {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  }
+);
+
+const data = await response.json();
+console.log(`Found ${data.count} users`);
+```
+
+```python Python
+import requests
+
+response = requests.get(
+  'http://localhost:3001/api/v1/users',
+  headers={'Authorization': f'Bearer {token}'},
+  params={'enterprise': '550e8400-e29b-41d4-a716-446655440000'}
+)
+
+data = response.json()
+print(f"Found {data['count']} users")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "users": [
+    {
+      "id": "user-123",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "phone": "+1234567890",
+      "emailVerifiedAt": "2024-01-15T10:30:00Z",
+      "provider": "local",
+      "createdAt": "2024-01-15T10:00:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z",
+      "roles": [
+        {
+          "id": "role-owner",
+          "name": "Owner",
+          "key": "owner",
+          "scopeType": "enterprise",
+          "orgUnitId": null
+        }
+      ],
+      "orgUnits": [
+        {
+          "id": "org-unit-123",
+          "name": "Acme Corporation",
+          "type": "exec"
+        }
+      ]
+    },
+    {
+      "id": "user-456",
+      "name": "Jane Smith",
+      "email": "jane@example.com",
+      "phone": "+1987654321",
+      "emailVerifiedAt": "2024-01-16T14:20:00Z",
+      "provider": "google",
+      "createdAt": "2024-01-16T14:20:00Z",
+      "updatedAt": "2024-01-16T14:20:00Z",
+      "roles": [
+        {
+          "id": "role-admin",
+          "name": "Admin",
+          "key": "admin",
+          "scopeType": "enterprise",
+          "orgUnitId": null
+        }
+      ],
+      "orgUnits": [
+        {
+          "id": "org-unit-456",
+          "name": "Sales",
+          "type": "sales"
+        }
+      ]
+    }
+  ],
+  "count": 2
+}
+```
+
+```json Empty Result
+{
+  "users": [],
+  "count": 0
+}
+```
+</ResponseExample>
+
+### Filter by Organizational Units
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/users?enterprise=550e8400-e29b-41d4-a716-446655440000&org_unit=dept-1,dept-2' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```javascript JavaScript
+const response = await fetch(
+  '/api/v1/users?' + new URLSearchParams({
+    enterprise: '550e8400-e29b-41d4-a716-446655440000',
+    org_unit: 'dept-1,dept-2'
+  }),
+  {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  }
+);
+
+const data = await response.json();
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "users": [
+    {
+      "id": "user-789",
+      "name": "Alice Johnson",
+      "email": "alice@example.com",
+      "phone": "+1555123456",
+      "emailVerifiedAt": "2024-01-17T09:15:00Z",
+      "provider": "invite",
+      "createdAt": "2024-01-17T09:00:00Z",
+      "updatedAt": "2024-01-17T09:15:00Z",
+      "roles": [
+        {
+          "id": "role-member",
+          "name": "Member",
+          "key": "member",
+          "scopeType": "enterprise",
+          "orgUnitId": null
+        }
+      ],
+      "orgUnits": [
+        {
+          "id": "dept-1",
+          "name": "Engineering",
+          "type": "exec"
+        }
+      ]
+    }
+  ],
+  "count": 1
+}
+```
+</ResponseExample>
+
+### Using Current User's Enterprise
+
+If the enterprise parameter is omitted, the API uses the enterprise from the JWT token:
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/users' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+</RequestExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Unauthorized">
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+Missing or invalid authentication token.
+</Accordion>
+
+<Accordion title="400 - Missing Enterprise">
+```json
+{
+  "error": "Missing required parameter: enterprise"
+}
+```
+
+Enterprise ID not provided and not found in JWT token.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "error": "Internal server error"
+}
+```
+
+An unexpected error occurred while fetching users.
+</Accordion>
+</AccordionGroup>
+
+## Query Logic
+
+### Enterprise Filtering
+
+The `enterprise` parameter is **required** and can be provided:
+1. Explicitly via query parameter
+2. From the JWT token's `enterpriseId` claim
+
+### Org Unit Filtering
+
+When `org_unit` parameter is provided:
+- Users must belong to at least one of the specified org units
+- Multiple org units can be specified as comma-separated values
+- Only users in those specific org units are returned
+
+When `org_unit` parameter is omitted:
+- All users in the enterprise are returned regardless of org unit membership
+
+## Data Aggregation
+
+The endpoint performs a single optimized database query that:
+1. Joins user data with enterprises, roles, and org units
+2. Groups results by user to prevent duplication
+3. Aggregates all roles and org units per user
+4. Returns a denormalized response for easy consumption
+
+## User Roles
+
+Each user can have multiple roles with different scopes:
+
+### Enterprise-Scoped Roles
+- Apply across the entire enterprise
+- `scopeType`: `"enterprise"`
+- `orgUnitId`: `null`
+
+### Org Unit-Scoped Roles
+- Apply only within a specific org unit
+- `scopeType`: `"org_unit"`
+- `orgUnitId`: ID of the specific org unit
+
+## Common Use Cases
+
+<AccordionGroup>
+<Accordion title="List All Enterprise Users">
+```javascript
+const allUsers = await fetch('/api/v1/users?enterprise=ENTERPRISE_ID', {
+  headers: { 'Authorization': `Bearer ${token}` }
+}).then(r => r.json());
+```
+</Accordion>
+
+<Accordion title="Get Users in Specific Department">
+```javascript
+const salesUsers = await fetch(
+  '/api/v1/users?enterprise=ENTERPRISE_ID&org_unit=sales-dept-id',
+  {
+    headers: { 'Authorization': `Bearer ${token}` }
+  }
+).then(r => r.json());
+```
+</Accordion>
+
+<Accordion title="Get Users in Multiple Departments">
+```javascript
+const multiDeptUsers = await fetch(
+  '/api/v1/users?enterprise=ENTERPRISE_ID&org_unit=dept1,dept2,dept3',
+  {
+    headers: { 'Authorization': `Bearer ${token}` }
+  }
+).then(r => r.json());
+```
+</Accordion>
+
+<Accordion title="Display User Table">
+```javascript
+const { users } = await fetch('/api/v1/users?enterprise=ENTERPRISE_ID', {
+  headers: { 'Authorization': `Bearer ${token}` }
+}).then(r => r.json());
+
+users.forEach(user => {
+  console.log(`${user.name} (${user.email})`);
+  console.log(`  Roles: ${user.roles.map(r => r.name).join(', ')}`);
+  console.log(`  Org Units: ${user.orgUnits.map(o => o.name).join(', ')}`);
+});
+```
+</Accordion>
+</AccordionGroup>
+
+## Pagination
+
+<Info>
+This endpoint does not currently support pagination. All matching users are returned in a single response. For enterprises with many users, consider implementing client-side pagination or filtering.
+</Info>
+
+## Performance Considerations
+
+- The endpoint uses optimized joins to minimize database queries
+- Results are aggregated efficiently to prevent N+1 query problems
+- For large enterprises (1000+ users), consider implementing pagination
+
+<Tip>
+For better performance with large datasets, filter by specific org units rather than fetching all enterprise users.
+</Tip>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Invite User" icon="envelope" href="/api-reference/auth/invite">
+  Send invitation to add new users
+</Card>
+
+<Card title="List Org Units" icon="sitemap" href="/api-reference/org/org-units-list">
+  Get organizational units for filtering
+</Card>
+
+<Card title="List Roles" icon="user-shield" href="/api-reference/org/roles">
+  Get available roles in your enterprise
+</Card>
+</CardGroup>
+
+
+
+
+
+

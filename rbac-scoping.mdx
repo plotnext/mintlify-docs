@@ -1,0 +1,206 @@
+---
+title: "Scoped Permissions"
+description: "Understanding enterprise-wide and org-unit specific permissions"
+icon: "building"
+---
+
+## Scoped Permissions
+
+### Permission Scope Types
+
+<AccordionGroup>
+<Accordion title="Enterprise-Wide Scope">
+Permissions that apply across the entire enterprise:
+
+```typescript
+{
+  resource: "meeting",
+  action: "create",
+  scope: {
+    enterprise: true,
+    orgUnits: []
+  }
+}
+```
+
+**Use Cases**:
+- System administrators
+- Enterprise-wide meeting creation
+- Global user management
+</Accordion>
+
+<Accordion title="Org Unit Scope">
+Permissions limited to specific organizational units:
+
+```typescript
+{
+  resource: "meeting", 
+  action: "read",
+  scope: {
+    enterprise: false,
+    orgUnits: ["sales-team-id", "marketing-team-id"]
+  }
+}
+```
+
+**Use Cases**:
+- Department-specific access
+- Team-based permissions
+- Hierarchical org structure
+</Accordion>
+</AccordionGroup>
+
+## Scope Implementation
+
+### Database Schema
+
+The `user_role_assignment` table handles scoping:
+
+```sql
+CREATE TABLE user_role_assignment (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES user(id) ON DELETE CASCADE,
+  role_id UUID REFERENCES role(id) ON DELETE CASCADE,
+  enterprise_id UUID REFERENCES enterprise(id) ON DELETE CASCADE,
+  org_unit_id UUID REFERENCES org_unit(id) ON DELETE CASCADE,
+  scope_type TEXT CHECK (scope_type IN ('enterprise', 'org_unit')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Key Fields**:
+- `scope_type`: 'enterprise' or 'org_unit'
+- `org_unit_id`: Required when scope_type is 'org_unit'
+
+### Scope Resolution Logic
+
+```typescript
+function resolveUserScope(userId: string, enterpriseId: string) {
+  const assignments = await getUserRoleAssignments(userId, enterpriseId);
+  
+  const capabilities = {
+    enterprise: {},
+    orgUnits: {}
+  };
+  
+  for (const assignment of assignments) {
+    const role = await getRole(assignment.role_id);
+    const permissions = await getRolePermissions(role.id);
+    
+    if (assignment.scope_type === 'enterprise') {
+      // Add to enterprise-wide capabilities
+      capabilities.enterprise = mergePermissions(capabilities.enterprise, permissions);
+    } else if (assignment.scope_type === 'org_unit') {
+      // Add to org-unit specific capabilities
+      const orgUnitId = assignment.org_unit_id;
+      capabilities.orgUnits[orgUnitId] = mergePermissions(
+        capabilities.orgUnits[orgUnitId] || {}, 
+        permissions
+      );
+    }
+  }
+  
+  return capabilities;
+}
+```
+
+## Common Use Cases
+
+### Meeting Management
+
+```typescript
+// Check if user can manage meetings in a specific org unit
+function canManageMeetings(userId: string, orgUnitId: string) {
+  const capabilities = await getUserCapabilities(userId);
+  const meetingPermissions = capabilities.meeting;
+  
+  return {
+    canCreate: meetingPermissions?.create?.enterprise || 
+               meetingPermissions?.create?.orgUnits.includes(orgUnitId),
+    canUpdate: meetingPermissions?.update?.enterprise || 
+               meetingPermissions?.update?.orgUnits.includes(orgUnitId),
+    canDelete: meetingPermissions?.delete?.enterprise || 
+               meetingPermissions?.delete?.orgUnits.includes(orgUnitId)
+  };
+}
+```
+
+### User Administration
+
+```typescript
+// Check if user can manage other users
+function canManageUsers(userId: string, targetOrgUnitId?: string) {
+  const capabilities = await getUserCapabilities(userId);
+  const userPermissions = capabilities.user;
+  
+  if (!userPermissions) return false;
+  
+  // Enterprise-wide user management
+  if (userPermissions.create?.enterprise) return true;
+  
+  // Org-unit specific user management
+  if (targetOrgUnitId && userPermissions.create?.orgUnits.includes(targetOrgUnitId)) {
+    return true;
+  }
+  
+  return false;
+}
+```
+
+### Role Assignment
+
+```typescript
+// Check if user can assign specific roles
+function canAssignRole(userId: string, targetRoleKey: string) {
+  const userCapabilities = await getUserCapabilities(userId);
+  const availableRoles = await getAllRoles();
+  
+  const userRole = availableRoles.find(r => 
+    userCapabilities.role?.read?.enterprise || 
+    userCapabilities.role?.read?.orgUnits.length > 0
+  );
+  
+  const targetRole = availableRoles.find(r => r.key === targetRoleKey);
+  
+  if (!userRole || !targetRole) return false;
+  
+  // User can only assign roles with lower priority
+  return userRole.priority > targetRole.priority;
+}
+```
+
+## Best Practices
+
+### Do's
+
+<Check>
+- **Use enterprise scope for system-wide operations**: Global administrators should have enterprise-wide permissions
+- **Use org-unit scope for team-specific access**: Department managers should have org-unit scoped permissions
+- **Validate scope context**: Always check if the user has permission in the specific context they're operating
+- **Cache scope resolution**: Cache user capabilities to avoid repeated database queries
+</Check>
+
+### Don'ts
+
+<Warning>
+- **Don't mix scope types**: Avoid giving users both enterprise and org-unit permissions for the same resource
+- **Don't ignore org-unit context**: Always validate that users can only access data within their assigned org units
+- **Don't hardcode scope assumptions**: Always check the actual scope rather than assuming based on role
+</Warning>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+<Card title="Permission Matrix" icon="key" href="/rbac-permissions">
+  Understanding the base permissions system
+</Card>
+
+<Card title="Database Schema" icon="database" href="/rbac-database">
+  How scoping is implemented in the database
+</Card>
+
+<Card title="API Integration" icon="code" href="/rbac-api">
+  Getting scoped user capabilities via API
+</Card>
+</CardGroup>

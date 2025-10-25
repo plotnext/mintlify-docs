@@ -1,0 +1,380 @@
+---
+title: "Troubleshooting"
+description: "Common issues and solutions for RBAC implementation"
+icon: "wrench"
+---
+
+## Troubleshooting
+
+### Common Issues
+
+<AccordionGroup>
+<Accordion title="Permission Denied Errors">
+**Problem**: User gets 403 errors despite having the correct role.
+
+**Solutions**:
+1. Check if permission is scoped to specific org units
+2. Verify user is assigned to the correct org unit
+3. Ensure enterprise context is correct
+4. Check role-permission mappings in database
+
+```typescript
+// Debug user capabilities
+const capabilities = await getUserCapabilities(userId, enterpriseId);
+console.log('User capabilities:', JSON.stringify(capabilities, null, 2));
+```
+</Accordion>
+
+<Accordion title="Role Assignment Issues">
+**Problem**: Cannot assign roles to users.
+
+**Solutions**:
+1. Verify role hierarchy (can only assign lower priority roles)
+2. Check if user has role management permissions
+3. Ensure target user is in the same enterprise
+4. Validate role keys exist in the system
+
+```typescript
+// Check role assignment permissions
+const canManageRoles = capabilities.role?.create?.enterprise || 
+                      capabilities.role?.create?.orgUnits.length > 0;
+```
+</Accordion>
+
+<Accordion title="Frontend Permission Issues">
+**Problem**: UI elements not showing/hiding correctly.
+
+**Solutions**:
+1. Check if permissions are loaded (`isLoading` state)
+2. Verify permission checking logic
+3. Ensure org unit context is correct
+4. Check browser console for errors
+
+```typescript
+// Debug frontend permissions
+const { scoped, isLoading, hasAny } = usePermissions();
+console.log('Permissions loaded:', !isLoading);
+console.log('User capabilities:', scoped);
+console.log('Can create meetings:', hasAny('create', 'meeting'));
+```
+</Accordion>
+</AccordionGroup>
+
+## Debugging Tools
+
+### Permission Debugger
+
+```typescript
+export async function debugUserPermissions(userId: string, enterpriseId: string) {
+  console.log('=== Permission Debug ===');
+  
+  // Get user's role assignments
+  const roleAssignments = await db.query(`
+    SELECT 
+      ura.*,
+      r.key as role_key,
+      r.name as role_name,
+      r.priority,
+      ou.name as org_unit_name
+    FROM user_role_assignment ura
+    JOIN role r ON ura.role_id = r.id
+    LEFT JOIN org_unit ou ON ura.org_unit_id = ou.id
+    WHERE ura.user_id = $1 AND ura.enterprise_id = $2
+  `, [userId, enterpriseId]);
+  
+  console.log('Role Assignments:', roleAssignments.rows);
+  
+  // Get user's capabilities
+  const capabilities = await getUserCapabilities(userId, enterpriseId);
+  console.log('User Capabilities:', JSON.stringify(capabilities, null, 2));
+  
+  // Check specific permission
+  const canCreateMeetings = capabilities.meeting?.create;
+  console.log('Can create meetings:', canCreateMeetings);
+  
+  return { roleAssignments: roleAssignments.rows, capabilities };
+}
+```
+
+### Database Query Debugger
+
+```sql
+-- Debug user role assignments
+SELECT 
+  u.email,
+  r.key as role_key,
+  r.name as role_name,
+  r.priority,
+  ura.scope_type,
+  ou.name as org_unit_name
+FROM user_role_assignment ura
+JOIN user u ON ura.user_id = u.id
+JOIN role r ON ura.role_id = r.id
+LEFT JOIN org_unit ou ON ura.org_unit_id = ou.id
+WHERE u.email = 'user@example.com'
+  AND ura.enterprise_id = 'enterprise-id-here';
+
+-- Debug role permissions
+SELECT 
+  r.key as role_key,
+  p.resource,
+  p.action
+FROM role r
+JOIN role_permission rp ON r.id = rp.role_id
+JOIN permission p ON rp.permission_id = p.id
+WHERE r.key = 'admin'
+ORDER BY p.resource, p.action;
+
+-- Debug user capabilities
+SELECT 
+  p.resource,
+  p.action,
+  ura.scope_type,
+  ura.org_unit_id,
+  r.priority
+FROM user_role_assignment ura
+JOIN role r ON ura.role_id = r.id
+JOIN role_permission rp ON r.id = rp.role_id
+JOIN permission p ON rp.permission_id = p.id
+WHERE ura.user_id = 'user-id-here'
+  AND ura.enterprise_id = 'enterprise-id-here'
+ORDER BY r.priority DESC;
+```
+
+## Common Error Messages
+
+### "Insufficient permissions"
+
+**Cause**: User doesn't have the required permission for the resource/action.
+
+**Debug Steps**:
+1. Check user's role assignments
+2. Verify role has the required permission
+3. Check if permission is scoped correctly
+4. Ensure enterprise context is correct
+
+```typescript
+// Debug insufficient permissions
+const capabilities = await getUserCapabilities(userId, enterpriseId);
+const requiredPermission = capabilities[resource]?.[action];
+
+if (!requiredPermission) {
+  console.log(`User lacks ${action} permission for ${resource}`);
+  console.log('Available permissions:', Object.keys(capabilities));
+}
+```
+
+### "Cannot assign role - insufficient priority"
+
+**Cause**: User is trying to assign a role with equal or higher priority.
+
+**Debug Steps**:
+1. Check assigner's highest role priority
+2. Check target role priority
+3. Verify role hierarchy rules
+
+```typescript
+// Debug role assignment
+const assignerRole = await getUserHighestRole(assignerId, enterpriseId);
+const targetRole = await getRoleByKey(targetRoleKey, enterpriseId);
+
+console.log('Assigner role priority:', assignerRole.priority);
+console.log('Target role priority:', targetRole.priority);
+console.log('Can assign:', assignerRole.priority > targetRole.priority);
+```
+
+### "Invalid org unit"
+
+**Cause**: User is trying to access a resource in an org unit they don't have permission for.
+
+**Debug Steps**:
+1. Check user's org unit assignments
+2. Verify permission scope
+3. Check if org unit exists
+
+```typescript
+// Debug org unit access
+const userOrgUnits = await getUserOrgUnits(userId, enterpriseId);
+const requiredOrgUnit = 'target-org-unit-id';
+
+console.log('User org units:', userOrgUnits);
+console.log('Has access to org unit:', userOrgUnits.includes(requiredOrgUnit));
+```
+
+## Performance Issues
+
+### Slow Permission Checks
+
+**Symptoms**: API responses are slow, especially for permission-heavy operations.
+
+**Solutions**:
+1. Add database indexes
+2. Implement caching
+3. Optimize queries
+4. Use connection pooling
+
+```sql
+-- Add performance indexes
+CREATE INDEX CONCURRENTLY idx_user_role_assignment_user_enterprise 
+  ON user_role_assignment(user_id, enterprise_id);
+
+CREATE INDEX CONCURRENTLY idx_role_permission_role 
+  ON role_permission(role_id);
+
+CREATE INDEX CONCURRENTLY idx_permission_resource_action 
+  ON permission(resource, action);
+```
+
+### Memory Issues
+
+**Symptoms**: High memory usage, especially with many users.
+
+**Solutions**:
+1. Implement cache limits
+2. Use TTL for cache entries
+3. Monitor cache size
+4. Clear cache periodically
+
+```typescript
+// Implement cache limits
+const capabilitiesCache = new LRUCache({
+  max: 1000, // Maximum entries
+  ttl: 5 * 60 * 1000, // 5 minutes TTL
+  updateAgeOnGet: true
+});
+```
+
+## Data Integrity Issues
+
+### Orphaned Role Assignments
+
+**Problem**: Role assignments exist but roles or users are deleted.
+
+**Solution**: Use CASCADE deletes and regular cleanup.
+
+```sql
+-- Check for orphaned assignments
+SELECT ura.*
+FROM user_role_assignment ura
+LEFT JOIN user u ON ura.user_id = u.id
+LEFT JOIN role r ON ura.role_id = r.id
+WHERE u.id IS NULL OR r.id IS NULL;
+
+-- Clean up orphaned assignments
+DELETE FROM user_role_assignment
+WHERE user_id NOT IN (SELECT id FROM user)
+   OR role_id NOT IN (SELECT id FROM role);
+```
+
+### Duplicate Permissions
+
+**Problem**: Same permission assigned multiple times to a role.
+
+**Solution**: Use unique constraints and cleanup duplicates.
+
+```sql
+-- Check for duplicate role permissions
+SELECT role_id, permission_id, COUNT(*)
+FROM role_permission
+GROUP BY role_id, permission_id
+HAVING COUNT(*) > 1;
+
+-- Remove duplicates
+DELETE FROM role_permission
+WHERE id NOT IN (
+  SELECT MIN(id)
+  FROM role_permission
+  GROUP BY role_id, permission_id
+);
+```
+
+## Testing and Validation
+
+### Permission Test Suite
+
+```typescript
+describe('RBAC System', () => {
+  let adminUser: User;
+  let memberUser: User;
+  let enterpriseId: string;
+  
+  beforeEach(async () => {
+    // Setup test data
+    enterpriseId = await createTestEnterprise();
+    adminUser = await createTestUser(enterpriseId, ['admin']);
+    memberUser = await createTestUser(enterpriseId, ['member']);
+  });
+  
+  it('should allow admin to create meetings', async () => {
+    const capabilities = await getUserCapabilities(adminUser.id, enterpriseId);
+    expect(capabilities.meeting?.create?.enterprise).toBe(true);
+  });
+  
+  it('should restrict member to specific org units', async () => {
+    const capabilities = await getUserCapabilities(memberUser.id, enterpriseId);
+    expect(capabilities.meeting?.create?.enterprise).toBe(false);
+  });
+  
+  it('should prevent privilege escalation', async () => {
+    const canAssign = await canAssignRole(
+      memberUser.id, 
+      adminUser.id, 
+      'admin', 
+      enterpriseId
+    );
+    expect(canAssign).toBe(false);
+  });
+});
+```
+
+### Integration Test Helpers
+
+```typescript
+export async function createTestUser(
+  enterpriseId: string, 
+  roleKeys: string[], 
+  orgUnitIds: string[] = []
+): Promise<User> {
+  const user = await createUser({
+    email: `test-${Date.now()}@example.com`,
+    name: 'Test User',
+    enterpriseId
+  });
+  
+  for (const roleKey of roleKeys) {
+    await assignRoleToUser(user.id, roleKey, enterpriseId, orgUnitIds);
+  }
+  
+  return user;
+}
+
+export async function canAssignRole(
+  assignerId: string,
+  targetUserId: string,
+  roleKey: string,
+  enterpriseId: string
+): Promise<boolean> {
+  try {
+    await assignRoleToUser(targetUserId, roleKey, enterpriseId, [], assignerId);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+<Card title="Best Practices" icon="check-circle" href="/rbac-best-practices">
+  Guidelines for avoiding common issues
+</Card>
+
+<Card title="Database Schema" icon="database" href="/rbac-database">
+  Understanding the database structure
+</Card>
+
+<Card title="API Integration" icon="code" href="/rbac-api">
+  Debugging API integration issues
+</Card>
+</CardGroup>

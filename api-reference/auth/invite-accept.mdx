@@ -1,0 +1,261 @@
+---
+title: "Accept Invitation"
+api: "GET /api/v1/auth/invite/accept"
+description: "Accept user invitation and complete account setup"
+icon: "user-check"
+---
+
+## Overview
+
+Accept a user invitation by clicking the invitation link sent via email. This endpoint verifies the invitation token, sets up the user's enterprise access, assigns roles and organizational units, and logs them in automatically.
+
+## Authentication
+
+<Info>
+This endpoint does not require authentication - it's used to accept invitations via email links.
+</Info>
+
+## Request Parameters
+
+<ParamField query="token" type="string" required>
+  Magic token from the invitation email
+  
+  **Example**: `"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+</ParamField>
+
+## Response
+
+### Success Response
+
+The endpoint performs a redirect to the appropriate page after successful invitation acceptance. The user is automatically logged in with an `auth_token` cookie set.
+
+<Note>
+After successful invitation acceptance:
+- User is automatically logged in
+- An `auth_token` cookie is set with JWT token
+- User is redirected to the home page or specified redirect path
+- Enterprise access, roles, and organizational units are configured
+</Note>
+
+## Examples
+
+### Accept Invitation
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/auth/invite/accept?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' \
+  -L -v
+```
+
+```javascript JavaScript
+// This is typically handled by clicking a link in an email
+// The browser will automatically follow the redirect
+const inviteUrl = 'http://localhost:3001/api/v1/auth/invite/accept?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+window.location.href = inviteUrl;
+```
+
+```python Python
+import requests
+
+# Follow redirects to see the final destination
+response = requests.get(
+  'http://localhost:3001/api/v1/auth/invite/accept',
+  params={'token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'},
+  allow_redirects=True
+)
+
+print(f"Final URL: {response.url}")
+print(f"Status: {response.status_code}")
+
+# Check if auth cookie was set
+if 'auth_token' in response.cookies:
+  print("User successfully logged in")
+```
+</RequestExample>
+
+<ResponseExample>
+```http Success - Redirect Response
+HTTP/1.1 302 Found
+Location: http://localhost:3001/home
+Set-Cookie: auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; HttpOnly; Secure; SameSite=Lax; Max-Age=604800
+```
+
+```json Error Response
+{
+  "error": "Link expired or already used"
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="400 - Missing Token">
+```json
+{
+  "error": "Missing token"
+}
+```
+
+The invitation token parameter is missing from the URL.
+</Accordion>
+
+<Accordion title="400 - Invalid Token Type">
+```json
+{
+  "error": "Invalid token type"
+}
+```
+
+The token is not an invitation token (wrong purpose).
+</Accordion>
+
+<Accordion title="400 - Missing Enterprise">
+```json
+{
+  "error": "Missing enterprise in token"
+}
+```
+
+The invitation token doesn't contain enterprise information.
+</Accordion>
+
+<Accordion title="400 - Link Expired or Used">
+```json
+{
+  "error": "Link expired or already used"
+}
+```
+
+The invitation link has expired or has already been used.
+</Accordion>
+
+<Accordion title="404 - User Not Found">
+```json
+{
+  "error": "User not found"
+}
+```
+
+The user referenced in the invitation token doesn't exist.
+</Accordion>
+
+<Accordion title="404 - Enterprise Not Found">
+```json
+{
+  "error": "Enterprise not found"
+}
+```
+
+The enterprise referenced in the invitation doesn't exist.
+</Accordion>
+
+<Accordion title="400 - Invalid Role/Org Unit">
+```json
+{
+  "error": "Invite references roles from another enterprise"
+}
+```
+
+The invitation references roles or org units from a different enterprise.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "error": "Internal server error"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## Invitation Acceptance Process
+
+<Steps>
+<Step title="User Clicks Link">
+  User clicks the invitation link in their email
+</Step>
+
+<Step title="Token Validation">
+  System validates the magic token and extracts invitation data
+</Step>
+
+<Step title="User Verification">
+  System verifies the user exists and the invitation is valid
+</Step>
+
+<Step title="Enterprise Setup">
+  User is added to the enterprise if not already a member
+</Step>
+
+<Step title="Role Assignment">
+  User is assigned the roles specified in the invitation
+</Step>
+
+<Step title="Org Unit Assignment">
+  User is added to the organizational units specified in the invitation
+</Step>
+
+<Step title="Email Verification">
+  User's email is marked as verified
+</Step>
+
+<Step title="Authentication">
+  JWT token is created and user is automatically logged in
+</Step>
+
+<Step title="Redirect">
+  User is redirected to the home page or specified redirect path
+</Step>
+</Steps>
+
+## Token Structure
+
+The invitation token contains:
+- **Purpose**: `"invite"`
+- **User ID**: Target user's ID
+- **Enterprise ID**: Enterprise to join
+- **Role IDs**: Array of roles to assign
+- **Org Unit IDs**: Array of organizational units to join
+- **Redirect Path**: Optional redirect after acceptance
+- **Expiry**: Token expiration time
+
+## Default Behavior
+
+If no specific roles are provided in the invitation:
+- User is assigned the default "member" role
+- User gets enterprise-level access
+- User can be assigned to specific org units later
+
+## Security Features
+
+- **One-time use**: Invitation tokens are consumed after acceptance
+- **Time-limited**: Tokens expire after a set period
+- **Enterprise validation**: Ensures roles/org units belong to the correct enterprise
+- **Automatic verification**: Email is verified upon invitation acceptance
+- **Secure cookies**: Auth tokens are HTTP-only and secure
+
+## Use Cases
+
+- **Team Onboarding**: Invite new team members to join an enterprise
+- **Role-based Access**: Assign specific roles and permissions
+- **Organizational Structure**: Add users to specific departments/teams
+- **Email Verification**: Verify email addresses through invitation process
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Send Invitation" icon="user-plus" href="/api-reference/auth/invite">
+  Send invitation to new users
+</Card>
+
+<Card title="Get Current User" icon="user" href="/api-reference/auth/me">
+  Get user info after invitation acceptance
+</Card>
+</CardGroup>

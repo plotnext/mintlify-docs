@@ -1,0 +1,332 @@
+---
+title: "Get Organizational Unit"
+api: "GET /api/v1/org-units/{id}"
+description: "Retrieve details of a specific organizational unit"
+icon: "eye"
+---
+
+## Overview
+
+Fetch detailed information about a specific organizational unit by its ID. Returns the org unit with its parent details included.
+
+## Authentication
+
+<Warning>
+This endpoint requires authentication. Include your JWT token in the request.
+</Warning>
+
+Provide authentication via:
+- **Authorization header**: `Authorization: Bearer YOUR_TOKEN`
+- **Cookie**: `auth_token` (automatically included in browser requests)
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The ID of the organizational unit to retrieve (UUID)
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"`
+</ParamField>
+
+## Response
+
+<ResponseField name="orgUnit" type="object">
+  Organizational unit object with parent details
+  
+  <Expandable title="Org Unit Object">
+    <ResponseField name="id" type="string">
+      Org unit unique identifier (UUID)
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Org unit name
+    </ResponseField>
+    
+    <ResponseField name="parentId" type="string | null">
+      Parent org unit ID if this is a child unit, `null` if root level
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Org unit type
+      
+      **Options**: `"sales"`, `"cs"`, `"onboarding"`, `"exec"`
+    </ResponseField>
+    
+    <ResponseField name="enterpriseId" type="string">
+      Enterprise ID this org unit belongs to
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      Creation timestamp (ISO 8601)
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      Last update timestamp (ISO 8601)
+    </ResponseField>
+    
+    <ResponseField name="parent" type="object | null">
+      Parent org unit details (if exists)
+      
+      <Expandable title="Parent Object">
+        <ResponseField name="id" type="string">
+          Parent org unit ID
+        </ResponseField>
+        
+        <ResponseField name="name" type="string">
+          Parent org unit name
+        </ResponseField>
+        
+        <ResponseField name="type" type="string">
+          Parent org unit type
+        </ResponseField>
+        
+        <ResponseField name="parentId" type="string | null">
+          Grandparent org unit ID (if exists)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Get Org Unit by ID
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/org-units/org-unit-abc123' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/org-units/org-unit-abc123', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+
+const data = await response.json();
+console.log('Org Unit:', data.orgUnit.name);
+```
+
+```python Python
+import requests
+
+response = requests.get(
+  'http://localhost:3001/api/v1/org-units/org-unit-abc123',
+  headers={'Authorization': f'Bearer {token}'}
+)
+
+data = response.json()
+print(f"Org Unit: {data['orgUnit']['name']}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Root Org Unit
+{
+  "orgUnit": {
+    "id": "root-org-unit",
+    "name": "Acme Corporation",
+    "parentId": null,
+    "type": "exec",
+    "enterpriseId": "550e8400-e29b-41d4-a716-446655440000",
+    "createdAt": "2024-03-01T08:00:00Z",
+    "updatedAt": "2024-03-01T08:00:00Z",
+    "parent": null
+  }
+}
+```
+
+```json Child Org Unit
+{
+  "orgUnit": {
+    "id": "sales-emea",
+    "name": "Sales EMEA",
+    "parentId": "sales-dept",
+    "type": "sales",
+    "enterpriseId": "550e8400-e29b-41d4-a716-446655440000",
+    "createdAt": "2024-03-10T09:00:00Z",
+    "updatedAt": "2024-03-15T14:25:00Z",
+    "parent": {
+      "id": "sales-dept",
+      "name": "Sales",
+      "type": "sales",
+      "parentId": "root-org-unit"
+    }
+  }
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Unauthorized">
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+Missing or invalid authentication token.
+</Accordion>
+
+<Accordion title="404 - Not Found">
+```json
+{
+  "error": "Org unit not found or does not belong to your enterprise"
+}
+```
+
+The org unit with the specified ID:
+- Doesn't exist
+- Belongs to a different enterprise
+- Is not a valid UUID
+</Accordion>
+
+<Accordion title="500 - Internal Server Error">
+```json
+{
+  "error": "Internal server error"
+}
+```
+
+An unexpected error occurred while fetching the org unit.
+</Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<AccordionGroup>
+<Accordion title="Display Org Unit Details">
+```javascript
+// Fetch and display org unit information
+async function displayOrgUnit(orgUnitId) {
+  const response = await fetch(`/api/v1/org-units/${orgUnitId}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  
+  const { orgUnit } = await response.json();
+  
+  console.log(`Name: ${orgUnit.name}`);
+  console.log(`Type: ${orgUnit.type}`);
+  if (orgUnit.parent) {
+    console.log(`Parent: ${orgUnit.parent.name}`);
+  } else {
+    console.log('Root-level org unit');
+  }
+}
+
+await displayOrgUnit('sales-emea');
+```
+</Accordion>
+
+<Accordion title="Build Breadcrumb for Org Unit">
+```javascript
+// Get org unit and build breadcrumb from parent chain
+async function getOrgUnitBreadcrumb(orgUnitId) {
+  const breadcrumb = [];
+  let currentId = orgUnitId;
+  
+  while (currentId) {
+    const response = await fetch(`/api/v1/org-units/${currentId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    const { orgUnit } = await response.json();
+    breadcrumb.unshift({
+      id: orgUnit.id,
+      name: orgUnit.name
+    });
+    
+    currentId = orgUnit.parentId;
+  }
+  
+  return breadcrumb;
+}
+
+const breadcrumb = await getOrgUnitBreadcrumb('sales-uk');
+console.log(breadcrumb.map(b => b.name).join(' > '));
+// Output: "Acme Corporation > Sales > Sales EMEA > Sales UK"
+```
+</Accordion>
+
+<Accordion title="Verify Org Unit Before Update">
+```javascript
+// Check org unit details before updating
+async function safeUpdateOrgUnit(orgUnitId, updates) {
+  // First, fetch current state
+  const response = await fetch(`/api/v1/org-units/${orgUnitId}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  
+  if (!response.ok) {
+    throw new Error('Org unit not found');
+  }
+  
+  const { orgUnit } = await response.json();
+  console.log('Current state:', orgUnit);
+  
+  // Now update
+  const updateResponse = await fetch(`/api/v1/org-units/${orgUnitId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(updates)
+  });
+  
+  return updateResponse.json();
+}
+
+await safeUpdateOrgUnit('sales-emea', { name: 'Sales Europe' });
+```
+</Accordion>
+
+<Accordion title="Check if Org Unit is Root">
+```javascript
+// Check if an org unit is a root-level unit
+async function isRootOrgUnit(orgUnitId) {
+  const response = await fetch(`/api/v1/org-units/${orgUnitId}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  
+  const { orgUnit } = await response.json();
+  return orgUnit.parentId === null;
+}
+
+const isRoot = await isRootOrgUnit('sales-dept');
+console.log(isRoot ? 'Root unit' : 'Child unit');
+```
+</Accordion>
+</AccordionGroup>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="List All Org Units" icon="list" href="/api-reference/org/org-units-list">
+  View all organizational units
+</Card>
+
+<Card title="Create Org Unit" icon="plus" href="/api-reference/org/org-units-create">
+  Create a new organizational unit
+</Card>
+
+<Card title="Update Org Unit" icon="pen-to-square" href="/api-reference/org/org-units-update">
+  Update org unit details or move in hierarchy
+</Card>
+
+<Card title="List Users" icon="users" href="/api-reference/users/list">
+  Filter users by org unit
+</Card>
+</CardGroup>
+
+
+

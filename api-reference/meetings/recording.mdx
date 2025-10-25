@@ -1,0 +1,305 @@
+---
+title: "Get Meeting Recording"
+api: "GET /api/v1/meetings/[id]/recording"
+description: "Get meeting recording information and access details"
+icon: "video"
+---
+
+## Overview
+
+Retrieve recording information for a specific meeting including storage URL, duration, file size, and processing status.
+
+## Authentication
+
+<Note>
+Authentication is optional for this endpoint. If provided, it will be validated and used for permission checks.
+</Note>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Meeting ID (must be a valid UUID)
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"`
+</ParamField>
+
+## Response
+
+### Success Response
+
+<ResponseField name="success" type="boolean">
+  Success indicator: `true`
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Recording data
+
+  <Expandable title="Data Object">
+    <ResponseField name="id" type="string">
+      Recording ID
+    </ResponseField>
+    
+    <ResponseField name="meetingId" type="string">
+      Meeting ID
+    </ResponseField>
+    
+    <ResponseField name="url" type="string">
+      Recording storage URL (may be null if not available)
+    </ResponseField>
+    
+    <ResponseField name="durationMs" type="number">
+      Recording duration in milliseconds (may be null if not processed)
+    </ResponseField>
+    
+    <ResponseField name="durationMinutes" type="number">
+      Recording duration in minutes (calculated from milliseconds)
+    </ResponseField>
+    
+    <ResponseField name="durationSeconds" type="number">
+      Recording duration in seconds (calculated from milliseconds)
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Recording processing status
+    </ResponseField>
+    
+    <ResponseField name="fileSizeBytes" type="number">
+      Recording file size in bytes (may be null if not available)
+    </ResponseField>
+    
+    <ResponseField name="fileSizeMB" type="string">
+      Recording file size in megabytes (formatted to 2 decimal places)
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      Recording creation timestamp (ISO 8601)
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      Recording last update timestamp (ISO 8601)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Get Meeting Recording
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000/recording' \
+  -H 'Authorization: Bearer your_jwt_token_here'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000/recording', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer your_jwt_token_here'
+  }
+});
+
+const data = await response.json();
+
+if (data.success) {
+  const recording = data.data;
+  console.log('Recording status:', recording.status);
+  
+  if (recording.url) {
+    console.log('Recording URL:', recording.url);
+    console.log('Duration:', recording.durationMinutes, 'minutes');
+    console.log('File size:', recording.fileSizeMB, 'MB');
+  } else {
+    console.log('Recording not yet available');
+  }
+}
+```
+
+```python Python
+import requests
+
+response = requests.get(
+  'http://localhost:3001/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000/recording',
+  headers={'Authorization': 'Bearer your_jwt_token_here'}
+)
+
+data = response.json()
+
+if data.get('success'):
+  recording = data['data']
+  
+  if recording.get('url'):
+    print(f"Recording available: {recording['url']}")
+    print(f"Duration: {recording['durationMinutes']} minutes")
+    print(f"File size: {recording['fileSizeMB']} MB")
+    print(f"Status: {recording['status']}")
+  else:
+    print("Recording not yet available")
+    print(f"Status: {recording['status']}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success - Recording Available
+{
+  "success": true,
+  "data": {
+    "id": "rec-550e8400-e29b-41d4-a716-446655440000",
+    "meetingId": "550e8400-e29b-41d4-a716-446655440000",
+    "url": "https://storage.example.com/recordings/meeting-123.mp4",
+    "durationMs": 1800000,
+    "durationMinutes": 30,
+    "durationSeconds": 0,
+    "status": "completed",
+    "fileSizeBytes": 52428800,
+    "fileSizeMB": "50.00",
+    "createdAt": "2024-01-15T10:35:00.000Z",
+    "updatedAt": "2024-01-15T10:45:00.000Z"
+  }
+}
+```
+
+```json Success - Recording Processing
+{
+  "success": true,
+  "data": {
+    "id": "rec-550e8400-e29b-41d4-a716-446655440000",
+    "meetingId": "550e8400-e29b-41d4-a716-446655440000",
+    "url": null,
+    "durationMs": null,
+    "durationMinutes": null,
+    "durationSeconds": null,
+    "status": "processing",
+    "fileSizeBytes": null,
+    "fileSizeMB": null,
+    "createdAt": "2024-01-15T10:35:00.000Z",
+    "updatedAt": "2024-01-15T10:40:00.000Z"
+  }
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="400 - Invalid Meeting ID Format">
+```json
+{
+  "error": "Invalid meeting ID format",
+  "message": "Meeting ID must be a valid UUID"
+}
+```
+
+The meeting ID is not a valid UUID format.
+</Accordion>
+
+<Accordion title="404 - Meeting Not Found">
+```json
+{
+  "error": "Meeting not found",
+  "message": "This meeting does not exist"
+}
+```
+
+The meeting doesn't exist.
+</Accordion>
+
+<Accordion title="404 - Recording Not Found">
+```json
+{
+  "error": "Recording not found",
+  "message": "No recording available for this meeting"
+}
+```
+
+No recording exists for this meeting.
+</Accordion>
+
+<Accordion title="401 - Invalid Token">
+```json
+{
+  "error": "Invalid token"
+}
+```
+
+The provided authentication token is invalid.
+</Accordion>
+
+<Accordion title="403 - Forbidden">
+```json
+{
+  "error": "Forbidden"
+}
+```
+
+The user doesn't have permission to access this meeting's recording.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "error": "Internal server error",
+  "message": "Failed to fetch recording"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## Recording Status Values
+
+| Status | Description |
+|--------|-------------|
+| `processing` | Recording is being processed/encoded |
+| `completed` | Recording is ready and available |
+| `failed` | Recording processing failed |
+| `pending` | Recording request is pending |
+| `cancelled` | Recording was cancelled |
+
+## Recording Availability
+
+Recordings may not be available for all meetings due to:
+- **Recording not enabled**: Meeting wasn't set to record
+- **Processing delay**: Recording is still being processed
+- **Processing failure**: Technical issues during recording processing
+- **Storage issues**: Problems with recording storage
+- **Privacy settings**: Recording may be restricted by privacy policies
+
+## Use Cases
+
+- **Meeting Playback**: Allow users to watch meeting recordings
+- **Review and Analysis**: Review meeting content after the fact
+- **Training Materials**: Use recordings for training purposes
+- **Compliance**: Maintain meeting records for compliance requirements
+- **Accessibility**: Provide recordings for users who couldn't attend
+
+## File Size and Duration
+
+- **Duration**: Calculated from audio/video analysis or meeting metadata
+- **File Size**: Varies based on video quality, resolution, and duration
+- **Format**: Typically MP4 for video, MP3 for audio-only recordings
+- **Quality**: Depends on meeting platform and settings
+
+## Security Considerations
+
+- Recording URLs may have expiration times
+- Access should be restricted based on user permissions
+- Recordings may contain sensitive information
+- Consider implementing additional authentication for recording access
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Get Meeting Details" icon="calendar-days" href="/api-reference/meetings/get">
+  Get comprehensive meeting information including recording summary
+</Card>
+
+<Card title="Get Meeting Transcript" icon="file-text" href="/api-reference/meetings/transcript">
+  Get meeting transcript as alternative to recording
+</Card>
+</CardGroup>

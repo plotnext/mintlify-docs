@@ -1,0 +1,254 @@
+---
+title: "Get Settings"
+api: "GET /api/v1/settings"
+description: "Retrieve enterprise or user-level settings"
+icon: "gears"
+---
+
+## Overview
+
+Retrieve settings configured for the authenticated user or their enterprise. Settings are stored as JSON objects and can be filtered by type.
+
+## Authentication
+
+<Info>
+This endpoint requires authentication via JWT token (Bearer token or auth cookie).
+</Info>
+
+## Query Parameters
+
+<ParamField query="type" type="string">
+  Filter settings by type (e.g., `"calendar.preferences"`).
+  
+  **Example**: `"calendar.preferences"`
+</ParamField>
+
+## Response
+
+### Success Response
+
+<ResponseField name="success" type="boolean">
+  Success indicator: `true`
+</ResponseField>
+
+<ResponseField name="data" type="array">
+  Array of setting objects
+
+  <Expandable title="Setting Object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the setting
+    </ResponseField>
+    
+    <ResponseField name="enterpriseId" type="string">
+      Enterprise ID this setting belongs to
+    </ResponseField>
+    
+    <ResponseField name="userId" type="string">
+      User ID this setting belongs to (null for enterprise-level settings)
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Setting type identifier
+    </ResponseField>
+    
+    <ResponseField name="Value" type="object">
+      Setting value as JSON object
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      ISO 8601 timestamp of when the setting was created
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      ISO 8601 timestamp of when the setting was last updated
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Get All Settings
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/settings' \
+  -H 'Authorization: Bearer YOUR_JWT_TOKEN'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/settings', {
+  headers: {
+    'Authorization': 'Bearer YOUR_JWT_TOKEN'
+  }
+});
+
+const data = await response.json();
+
+if (data.success) {
+  console.log('Settings:', data.data);
+}
+```
+
+```python Python
+import requests
+
+response = requests.get(
+  'http://localhost:3001/api/v1/settings',
+  headers={
+    'Authorization': 'Bearer YOUR_JWT_TOKEN'
+  }
+)
+
+data = response.json()
+
+if data.get('success'):
+  for setting in data['data']:
+    print(f"Setting Type: {setting['type']}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "success": true,
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "enterpriseId": "660e8400-e29b-41d4-a716-446655440001",
+      "userId": "770e8400-e29b-41d4-a716-446655440002",
+      "type": "calendar.preferences",
+      "Value": {
+        "calendarConnected": true,
+        "recordingSettings": {
+          "external": true,
+          "internal": true,
+          "calendarInviteRecording": true
+        }
+      },
+      "createdAt": "2024-01-15T10:00:00.000Z",
+      "updatedAt": "2024-01-15T10:00:00.000Z"
+    }
+  ]
+}
+```
+</ResponseExample>
+
+### Filter by Type
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/settings?type=calendar.preferences' \
+  -H 'Authorization: Bearer YOUR_JWT_TOKEN'
+```
+</RequestExample>
+
+<ResponseExample>
+```json Filtered Result
+{
+  "success": true,
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "enterpriseId": "660e8400-e29b-41d4-a716-446655440001",
+      "userId": "770e8400-e29b-41d4-a716-446655440002",
+      "type": "calendar.preferences",
+      "Value": {
+        "calendarConnected": true,
+        "recordingSettings": {
+          "external": true,
+          "internal": true,
+          "calendarInviteRecording": true
+        }
+      },
+      "createdAt": "2024-01-15T10:00:00.000Z",
+      "updatedAt": "2024-01-15T10:00:00.000Z"
+    }
+  ]
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="success" type="boolean">
+  Always `false` for error responses
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Unauthorized">
+```json
+{
+  "success": false,
+  "error": "Invalid or missing token"
+}
+```
+
+No valid authentication token provided.
+</Accordion>
+
+<Accordion title="400 - Missing Enterprise ID">
+```json
+{
+  "success": false,
+  "error": "Token missing enterprise_id"
+}
+```
+
+The JWT token doesn't contain an enterprise ID.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "success": false,
+  "error": "Internal server error"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## Security
+
+<Warning>
+Settings are automatically scoped to the authenticated user's enterprise and user ID. Users can only access their own settings or enterprise-level settings.
+</Warning>
+
+## Setting Scope
+
+Settings can be:
+- **User-level**: Specific to the authenticated user (`userId` is set)
+- **Enterprise-level**: Shared across the enterprise (`userId` is null)
+
+The API automatically filters results based on the authenticated user's context.
+
+## Setting Types
+
+Common setting types include:
+- `calendar.preferences` - Calendar integration preferences
+- `notification.settings` - Notification preferences
+- `theme.preferences` - UI theme preferences
+- `workspace.settings` - Workspace configuration
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Create Setting" icon="plus" href="/api-reference/settings/post">
+  Create or update a setting
+</Card>
+
+<Card title="Update Setting" icon="pen" href="/api-reference/settings/put">
+  Update an existing setting
+</Card>
+
+<Card title="Delete Setting" icon="trash" href="/api-reference/settings/delete">
+  Delete a setting
+</Card>
+</CardGroup>
+
+

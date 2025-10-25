@@ -1,0 +1,193 @@
+---
+title: "Delete Settings"
+api: "DELETE /api/v1/settings"
+description: "Delete a setting by ID"
+icon: "trash"
+---
+
+## Overview
+
+Delete a setting by its ID. Only settings belonging to the authenticated user's enterprise and user context can be deleted.
+
+## Authentication
+
+<Info>
+This endpoint requires authentication via JWT token (Bearer token or auth cookie).
+</Info>
+
+## Query Parameters
+
+<ParamField query="id" type="string" required>
+  The ID of the setting to delete
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"`
+</ParamField>
+
+## Response
+
+### Success Response
+
+<ResponseField name="success" type="boolean">
+  Success indicator: `true`
+</ResponseField>
+
+## Examples
+
+### Delete a Setting
+
+<RequestExample>
+```bash cURL
+curl -X DELETE 'http://localhost:3001/api/v1/settings?id=550e8400-e29b-41d4-a716-446655440000' \
+  -H 'Authorization: Bearer YOUR_JWT_TOKEN'
+```
+
+```javascript JavaScript
+const settingId = '550e8400-e29b-41d4-a716-446655440000';
+
+const response = await fetch(`/api/v1/settings?id=${settingId}`, {
+  method: 'DELETE',
+  headers: {
+    'Authorization': 'Bearer YOUR_JWT_TOKEN'
+  }
+});
+
+const data = await response.json();
+
+if (data.success) {
+  console.log('Setting deleted successfully');
+}
+```
+
+```python Python
+import requests
+
+setting_id = '550e8400-e29b-41d4-a716-446655440000'
+
+response = requests.delete(
+  f'http://localhost:3001/api/v1/settings?id={setting_id}',
+  headers={
+    'Authorization': 'Bearer YOUR_JWT_TOKEN'
+  }
+)
+
+data = response.json()
+
+if data.get('success'):
+  print('Setting deleted successfully')
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "success": true
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="success" type="boolean">
+  Always `false` for error responses
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Unauthorized">
+```json
+{
+  "success": false,
+  "error": "Invalid or missing token"
+}
+```
+
+No valid authentication token provided.
+</Accordion>
+
+<Accordion title="400 - Missing ID">
+```json
+{
+  "success": false,
+  "error": "ID is required"
+}
+```
+
+The `id` query parameter is required but not provided.
+</Accordion>
+
+<Accordion title="400 - Missing Enterprise ID">
+```json
+{
+  "success": false,
+  "error": "Token missing enterprise_id"
+}
+```
+
+The JWT token doesn't contain an enterprise ID.
+</Accordion>
+
+<Accordion title="404 - Setting Not Found">
+```json
+{
+  "success": false,
+  "error": "Setting not found"
+}
+```
+
+No setting was found with the provided ID and user context. This can occur when:
+- The setting doesn't exist
+- The setting belongs to a different user/enterprise
+- You don't have permission to delete it
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "success": false,
+  "error": "Internal server error"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## Security
+
+<Warning>
+Users can only delete settings that belong to their enterprise and their own user context. The API automatically enforces these constraints.
+</Warning>
+
+## Delete Behavior
+
+- Only settings belonging to the authenticated user's enterprise and user ID can be deleted
+- Deletion is permanent and cannot be undone
+- The operation is idempotent - attempting to delete a non-existent setting will return a 404 error
+
+## Use Cases
+
+- Remove user-specific preferences
+- Clear enterprise-level configuration
+- Reset to defaults by deleting custom settings
+- Clean up old or unused settings
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Get Settings" icon="gear" href="/api-reference/settings/get">
+  Retrieve settings
+</Card>
+
+<Card title="Create Setting" icon="plus" href="/api-reference/settings/post">
+  Create or upsert a setting
+</Card>
+
+<Card title="Update Setting" icon="pen" href="/api-reference/settings/put">
+  Update an existing setting
+</Card>
+</CardGroup>
+
+

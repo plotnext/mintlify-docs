@@ -1,0 +1,234 @@
+---
+title: "Resend Verification Email"
+api: "POST /api/v1/auth/resend"
+description: "Resend email verification link to user"
+icon: "envelope"
+---
+
+## Overview
+
+Send a new email verification link to a user who hasn't verified their email address yet. This is useful when the original verification email was lost or expired.
+
+## Authentication
+
+<Info>
+This endpoint does not require authentication - it's used to resend verification emails.
+</Info>
+
+## Request Body
+
+<ParamField body="email" type="string" required>
+  Email address to resend verification to
+  
+  **Example**: `"john@example.com"`
+</ParamField>
+
+## Response
+
+### Success Response
+
+<ResponseField name="status" type="string">
+  Status of the verification request: `"pending_verification"`
+</ResponseField>
+
+<ResponseField name="delivery" type="string">
+  Email delivery status: `"sent"` or `"failed"`
+</ResponseField>
+
+<ResponseField name="id" type="string">
+  Email service delivery ID (when delivery is successful)
+</ResponseField>
+
+<ResponseField name="reason" type="string">
+  Failure reason (when delivery fails)
+</ResponseField>
+
+## Examples
+
+### Resend Verification Email
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/auth/resend' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "email": "john@example.com"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/auth/resend', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    email: 'john@example.com'
+  })
+});
+
+const data = await response.json();
+
+if (data.delivery === 'sent') {
+  console.log('Verification email sent successfully');
+} else {
+  console.log('Failed to send email:', data.reason);
+}
+```
+
+```python Python
+import requests
+
+response = requests.post(
+  'http://localhost:3001/api/v1/auth/resend',
+  json={
+    'email': 'john@example.com'
+  }
+)
+
+data = response.json()
+
+if data.get('delivery') == 'sent':
+  print('Verification email sent successfully')
+else:
+  print(f'Failed to send email: {data.get("reason")}')
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success - Email Sent
+{
+  "status": "pending_verification",
+  "delivery": "sent",
+  "id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+```json Success - Email Failed
+{
+  "status": "pending_verification",
+  "delivery": "failed",
+  "reason": "Invalid email address"
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="400 - Missing Email">
+```json
+{
+  "error": "Missing email"
+}
+```
+
+Email parameter is required but not provided.
+</Accordion>
+
+<Accordion title="404 - User Not Found">
+```json
+{
+  "error": "User not found"
+}
+```
+
+No user exists with the provided email address.
+</Accordion>
+
+<Accordion title="400 - Email Already Verified">
+```json
+{
+  "error": "Email already verified"
+}
+```
+
+The user's email has already been verified.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "error": "Internal server error"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## Email Verification Process
+
+<Steps>
+<Step title="User Requests Resend">
+  User provides their email address via this endpoint
+</Step>
+
+<Step title="Validation">
+  System validates email exists and is unverified
+</Step>
+
+<Step title="Token Generation">
+  A new magic verification token is generated with 15-minute expiry
+</Step>
+
+<Step title="Email Delivery">
+  Verification email is sent via Resend service
+</Step>
+
+<Step title="User Clicks Link">
+  User clicks the verification link in their email
+</Step>
+
+<Step title="Email Verified">
+  User's email is marked as verified in the database
+</Step>
+</Steps>
+
+## Email Template
+
+The verification email includes:
+- **Subject**: "Verify your email"
+- **Content**: Clickable link to `/api/v1/auth/verify?token=<magic_token>`
+- **Expiry**: Link expires in 15 minutes
+- **Security**: One-time use token
+
+## Rate Limiting
+
+<Warning>
+Consider implementing rate limiting to prevent abuse of this endpoint. Users should not be able to request unlimited verification emails.
+</Warning>
+
+## Use Cases
+
+- **Lost Email**: User didn't receive the original verification email
+- **Expired Link**: Original verification link expired (15 minutes)
+- **Wrong Email**: User entered wrong email during registration
+- **Spam Filter**: Verification email was caught by spam filters
+
+## Security Considerations
+
+- Verification tokens expire in 15 minutes
+- Tokens are single-use (consumed after verification)
+- No sensitive information is exposed in error messages
+- Email delivery status is tracked for debugging
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Register" icon="user-plus" href="/api-reference/auth/register">
+  Create new user account
+</Card>
+
+<Card title="Verify Email" icon="envelope-circle-check" href="/api-reference/auth/verify">
+  Verify email with token from email
+</Card>
+
+<Card title="Login" icon="right-to-bracket" href="/api-reference/auth/login">
+  Login after email verification
+</Card>
+</CardGroup>

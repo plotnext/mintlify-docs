@@ -1,0 +1,338 @@
+---
+title: "Database Schema"
+description: "Database structure and implementation details for the RBAC system"
+icon: "database"
+---
+
+## Database Schema
+
+### Core Tables
+
+<AccordionGroup>
+<Accordion title="role">
+```sql
+CREATE TABLE role (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  enterprise_id UUID REFERENCES enterprise(id),
+  key TEXT NOT NULL,
+  name TEXT NOT NULL,
+  priority INTEGER,
+  ui_config JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Key Fields**:
+- `key`: Programmatic role identifier
+- `priority`: Role hierarchy ordering
+- `enterprise_id`: NULL for system roles, UUID for custom roles
+</Accordion>
+
+<Accordion title="permission">
+```sql
+CREATE TABLE permission (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  resource TEXT NOT NULL,
+  action TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(resource, action)
+);
+```
+
+**Key Fields**:
+- `resource`: The entity being accessed (meeting, user, etc.)
+- `action`: The operation being performed (read, create, update, delete)
+</Accordion>
+
+<Accordion title="role_permission">
+```sql
+CREATE TABLE role_permission (
+  role_id UUID REFERENCES role(id) ON DELETE CASCADE,
+  permission_id UUID REFERENCES permission(id) ON DELETE CASCADE,
+  PRIMARY KEY (role_id, permission_id)
+);
+```
+
+Links roles to their permissions in a many-to-many relationship.
+</Accordion>
+
+<Accordion title="user_role_assignment">
+```sql
+CREATE TABLE user_role_assignment (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES user(id) ON DELETE CASCADE,
+  role_id UUID REFERENCES role(id) ON DELETE CASCADE,
+  enterprise_id UUID REFERENCES enterprise(id) ON DELETE CASCADE,
+  org_unit_id UUID REFERENCES org_unit(id) ON DELETE CASCADE,
+  scope_type TEXT CHECK (scope_type IN ('enterprise', 'org_unit')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Key Fields**:
+- `scope_type`: 'enterprise' or 'org_unit'
+- `org_unit_id`: Required when scope_type is 'org_unit'
+</Accordion>
+</AccordionGroup>
+
+## Database Queries
+
+### Getting User Capabilities
+
+```sql
+-- Get all permissions for a user in an enterprise
+SELECT 
+  p.resource,
+  p.action,
+  ura.scope_type,
+  ura.org_unit_id,
+  r.priority
+FROM user_role_assignment ura
+JOIN role r ON ura.role_id = r.id
+JOIN role_permission rp ON r.id = rp.role_id
+JOIN permission p ON rp.permission_id = p.id
+WHERE ura.user_id = $1 
+  AND ura.enterprise_id = $2
+  AND (r.enterprise_id IS NULL OR r.enterprise_id = $2)
+ORDER BY r.priority DESC;
+```
+
+### Role Hierarchy Query
+
+```sql
+-- Get roles ordered by priority
+SELECT 
+  key,
+  name,
+  priority,
+  enterprise_id
+FROM role
+WHERE enterprise_id IS NULL OR enterprise_id = $1
+ORDER BY priority DESC;
+```
+
+### Permission Matrix Query
+
+```sql
+-- Get all permissions grouped by resource and action
+SELECT 
+  p.resource,
+  p.action,
+  r.key as role_key,
+  r.name as role_name,
+  r.priority
+FROM permission p
+JOIN role_permission rp ON p.id = rp.permission_id
+JOIN role r ON rp.role_id = r.id
+WHERE r.enterprise_id IS NULL OR r.enterprise_id = $1
+ORDER BY p.resource, p.action, r.priority DESC;
+```
+
+## Data Seeding
+
+### Default Roles
+
+```sql
+-- Insert default system roles
+INSERT INTO role (key, name, priority, enterprise_id) VALUES
+('owner', 'Owner', 1000, NULL),
+('admin', 'Administrator', 500, NULL),
+('manager', 'Manager', 300, NULL),
+('member', 'Member', 100, NULL);
+```
+
+### Default Permissions
+
+```sql
+-- Insert all possible permissions
+INSERT INTO permission (resource, action) VALUES
+('meeting', 'read'),
+('meeting', 'create'),
+('meeting', 'update'),
+('meeting', 'delete'),
+('user', 'read'),
+('user', 'create'),
+('user', 'update'),
+('user', 'delete'),
+('org_unit', 'read'),
+('org_unit', 'create'),
+('org_unit', 'update'),
+('org_unit', 'delete'),
+('role', 'read'),
+('role', 'create'),
+('role', 'update'),
+('role', 'delete'),
+('enterprise', 'read'),
+('enterprise', 'create'),
+('enterprise', 'update'),
+('enterprise', 'delete');
+```
+
+### Role-Permission Mappings
+
+```sql
+-- Administrator permissions
+INSERT INTO role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM role r, permission p
+WHERE r.key = 'admin'
+  AND p.resource IN ('meeting', 'user', 'org_unit', 'role')
+  AND p.action IN ('read', 'create', 'update', 'delete');
+
+-- Member permissions
+INSERT INTO role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM role r, permission p
+WHERE r.key = 'member'
+  AND (
+    (p.resource = 'meeting' AND p.action IN ('read', 'create', 'update'))
+    OR (p.resource = 'user' AND p.action = 'read')
+    OR (p.resource = 'org_unit' AND p.action = 'read')
+  );
+```
+
+## Migration Scripts
+
+### Create RBAC Tables
+
+```sql
+-- Create role table
+CREATE TABLE IF NOT EXISTS role (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  enterprise_id UUID REFERENCES enterprise(id),
+  key TEXT NOT NULL,
+  name TEXT NOT NULL,
+  priority INTEGER,
+  ui_config JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(key, enterprise_id)
+);
+
+-- Create permission table
+CREATE TABLE IF NOT EXISTS permission (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  resource TEXT NOT NULL,
+  action TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(resource, action)
+);
+
+-- Create role_permission junction table
+CREATE TABLE IF NOT EXISTS role_permission (
+  role_id UUID REFERENCES role(id) ON DELETE CASCADE,
+  permission_id UUID REFERENCES permission(id) ON DELETE CASCADE,
+  PRIMARY KEY (role_id, permission_id)
+);
+
+-- Create user_role_assignment table
+CREATE TABLE IF NOT EXISTS user_role_assignment (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES user(id) ON DELETE CASCADE,
+  role_id UUID REFERENCES role(id) ON DELETE CASCADE,
+  enterprise_id UUID REFERENCES enterprise(id) ON DELETE CASCADE,
+  org_unit_id UUID REFERENCES org_unit(id) ON DELETE CASCADE,
+  scope_type TEXT CHECK (scope_type IN ('enterprise', 'org_unit')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS idx_user_role_assignment_user_enterprise 
+  ON user_role_assignment(user_id, enterprise_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_role_assignment_role 
+  ON user_role_assignment(role_id);
+
+CREATE INDEX IF NOT EXISTS idx_role_enterprise 
+  ON role(enterprise_id);
+
+CREATE INDEX IF NOT EXISTS idx_permission_resource_action 
+  ON permission(resource, action);
+```
+
+## Performance Optimization
+
+### Query Optimization
+
+```sql
+-- Optimized user capabilities query with proper indexing
+EXPLAIN ANALYZE
+SELECT 
+  p.resource,
+  p.action,
+  ura.scope_type,
+  ura.org_unit_id
+FROM user_role_assignment ura
+JOIN role r ON ura.role_id = r.id
+JOIN role_permission rp ON r.id = rp.role_id
+JOIN permission p ON rp.permission_id = p.id
+WHERE ura.user_id = $1 
+  AND ura.enterprise_id = $2;
+```
+
+### Caching Strategy
+
+```typescript
+// Cache user capabilities to reduce database load
+const capabilitiesCache = new Map<string, any>();
+
+export async function getCachedUserCapabilities(userId: string, enterpriseId: string) {
+  const cacheKey = `${userId}:${enterpriseId}`;
+  
+  if (capabilitiesCache.has(cacheKey)) {
+    return capabilitiesCache.get(cacheKey);
+  }
+  
+  const capabilities = await getUserCapabilities(userId, enterpriseId);
+  capabilitiesCache.set(cacheKey, capabilities);
+  
+  // Clear cache after 5 minutes
+  setTimeout(() => {
+    capabilitiesCache.delete(cacheKey);
+  }, 5 * 60 * 1000);
+  
+  return capabilities;
+}
+```
+
+## Data Integrity
+
+### Constraints and Validation
+
+```sql
+-- Ensure role priority is unique within enterprise
+ALTER TABLE role ADD CONSTRAINT unique_priority_per_enterprise 
+  UNIQUE (priority, enterprise_id);
+
+-- Ensure user can't have duplicate role assignments
+ALTER TABLE user_role_assignment ADD CONSTRAINT unique_user_role_org_unit 
+  UNIQUE (user_id, role_id, org_unit_id);
+
+-- Ensure org_unit_id is provided when scope_type is 'org_unit'
+ALTER TABLE user_role_assignment ADD CONSTRAINT check_org_unit_scope 
+  CHECK (
+    (scope_type = 'enterprise' AND org_unit_id IS NULL) OR
+    (scope_type = 'org_unit' AND org_unit_id IS NOT NULL)
+  );
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+<Card title="Role Hierarchy" icon="users" href="/rbac-roles">
+  Understanding the role system
+</Card>
+
+<Card title="Scoped Permissions" icon="building" href="/rbac-scoping">
+  How scoping works in the database
+</Card>
+
+<Card title="Backend Integration" icon="server" href="/rbac-backend">
+  Using the database in your backend code
+</Card>
+</CardGroup>

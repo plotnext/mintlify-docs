@@ -1,0 +1,120 @@
+---
+title: "API Introduction"
+description: "Welcome to the Arali API documentation"
+icon: "rocket"
+---
+
+## Welcome to Arali API
+
+The Arali API provides a comprehensive suite of endpoints for managing enterprise meetings, users, organizational units, and authentication. Built with modern REST principles, our API enables you to integrate Arali's powerful meeting management capabilities into your applications.
+
+## Base URL
+
+All API requests should be made to:
+
+```
+http://localhost:3001/api/v1
+```
+
+<Note>
+Replace `your-domain.com` with your actual Arali instance domain.
+</Note>
+
+## API Capabilities
+
+<CardGroup cols={2}>
+<Card title="Authentication" icon="key" href="/api-reference/authentication">
+  Secure user registration, login, and invitation management with JWT-based authentication
+</Card>
+
+<Card title="User Management" icon="users" href="/api-reference/users/list">
+  Manage users across your enterprise with role-based access control
+</Card>
+
+<Card title="Meetings" icon="calendar" href="/api-reference/meetings/create">
+  Create, schedule, and manage meetings with automated bot integration
+</Card>
+
+<Card title="Organization" icon="building" href="/api-reference/org/roles">
+  Organize your enterprise with hierarchical org units and custom roles
+</Card>
+</CardGroup>
+
+## Core Concepts
+
+### Enterprises
+
+An **enterprise** is the top-level organizational entity in Arali. Each enterprise has its own users, roles, org units, and meetings.
+
+### Organizational Units (Org Units)
+
+**Org units** represent departments or teams within your enterprise. They can be organized hierarchically (e.g., Sales → Sales EMEA → Sales UK).
+
+### Roles
+
+**Roles** define permissions and access levels for users. Arali includes system roles (Owner, Admin, Member) and supports custom enterprise-specific roles.
+
+### Authentication
+
+Arali uses **JWT (JSON Web Tokens)** for authentication. Tokens can be provided via:
+- Authorization header: `Authorization: Bearer YOUR_TOKEN`
+- HTTP-only cookies (for browser-based apps)
+
+## Common Response Codes
+
+All API endpoints follow standard HTTP response codes:
+
+| Code | Status | Description |
+|------|--------|-------------|
+| 200 | OK | Request successful |
+| 201 | Created | Resource created successfully |
+| 400 | Bad Request | Invalid request parameters |
+| 401 | Unauthorized | Missing or invalid authentication |
+| 403 | Forbidden | Insufficient permissions |
+| 404 | Not Found | Resource not found |
+| 409 | Conflict | Resource already exists |
+| 500 | Internal Server Error | Server error occurred |
+
+## Error Handling
+
+API errors return JSON responses with an `error` field describing the issue:
+
+```json
+{
+  "error": "Missing required parameter: email",
+  "field": "email"
+}
+```
+
+<Note>
+Some error responses include a `field` parameter indicating which input field caused the error.
+</Note>
+
+## Rate Limiting
+
+<Info>
+Rate limiting information will be added as it becomes available.
+</Info>
+
+## Support
+
+Need help? Contact our support team:
+
+- Email: support@arali.com
+- Documentation: [GitHub](https://github.com)
+
+## Next Steps
+
+<Steps>
+<Step title="Authenticate">
+  Start by [setting up authentication](/api-reference/authentication) for your application.
+</Step>
+
+<Step title="Create Users">
+  Learn how to [register users](/api-reference/auth/register) and [send invitations](/api-reference/auth/invite).
+</Step>
+
+<Step title="Manage Meetings">
+  Explore the [meetings API](/api-reference/meetings/create) to schedule and manage meetings.
+</Step>
+</Steps>

@@ -1,0 +1,397 @@
+---
+title: "List Roles"
+api: "GET /api/v1/roles"
+description: "Retrieve all available roles for your enterprise"
+icon: "user-shield"
+---
+
+## Overview
+
+Fetch all roles available in your enterprise, including both global system roles (Owner, Admin, Member) and custom enterprise-specific roles. Roles are returned sorted by priority, with higher priority roles listed first.
+
+## Authentication
+
+<Warning>
+This endpoint requires authentication. Include your JWT token in the request.
+</Warning>
+
+Provide authentication via:
+- **Authorization header**: `Authorization: Bearer YOUR_TOKEN`
+- **Cookie**: `auth_token` (automatically included in browser requests)
+
+## Request
+
+No request body or query parameters required. The enterprise context is automatically determined from the JWT token's `enterpriseId` claim.
+
+## Response
+
+<ResponseField name="roles" type="array">
+  Array of role objects sorted by priority (highest first)
+  
+  <Expandable title="Role Object">
+    <ResponseField name="id" type="string">
+      Role unique identifier (UUID)
+    </ResponseField>
+    
+    <ResponseField name="key" type="string">
+      Role key for programmatic reference
+      
+      **System roles**: `"owner"`, `"admin"`, `"member"`
+      
+      **Custom roles**: Your custom role keys
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Role display name
+      
+      **Examples**: `"Owner"`, `"Admin"`, `"Member"`, `"Sales Manager"`
+    </ResponseField>
+    
+    <ResponseField name="priority" type="number">
+      Role priority for ordering. Higher values indicate higher priority.
+      
+      **System priorities**:
+      - Owner: 1000
+      - Admin: 500
+      - Member: 100
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Fetch All Roles
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/roles' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/roles', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+
+const data = await response.json();
+console.log(`Found ${data.roles.length} roles`);
+```
+
+```python Python
+import requests
+
+response = requests.get(
+  'http://localhost:3001/api/v1/roles',
+  headers={'Authorization': f'Bearer {token}'}
+)
+
+data = response.json()
+print(f"Found {len(data['roles'])} roles")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "roles": [
+    {
+      "id": "role-owner-uuid",
+      "key": "owner",
+      "name": "Owner",
+      "priority": 1000
+    },
+    {
+      "id": "role-admin-uuid",
+      "key": "admin",
+      "name": "Admin",
+      "priority": 500
+    },
+    {
+      "id": "custom-role-1",
+      "key": "sales_manager",
+      "name": "Sales Manager",
+      "priority": 300
+    },
+    {
+      "id": "role-member-uuid",
+      "key": "member",
+      "name": "Member",
+      "priority": 100
+    }
+  ]
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Unauthorized">
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+Missing or invalid authentication token.
+</Accordion>
+
+<Accordion title="500 - Internal Server Error">
+```json
+{
+  "error": "Internal server error"
+}
+```
+
+An unexpected error occurred while fetching roles.
+</Accordion>
+</AccordionGroup>
+
+## Role Types
+
+### Global System Roles
+
+System roles have `enterpriseId = null` and are available to all enterprises:
+
+<AccordionGroup>
+<Accordion title="Owner">
+**Priority**: 1000  
+**Key**: `owner`
+
+Full administrative access to the enterprise. Can:
+- Manage all users and their roles
+- Create and delete organizational units
+- Configure enterprise settings
+- Access all meetings and data
+- Invite new users with any role
+</Accordion>
+
+<Accordion title="Admin">
+**Priority**: 500  
+**Key**: `admin`
+
+Administrative access with some limitations. Can:
+- Manage users within assigned org units
+- Create sub-organizational units
+- View and manage meetings
+- Invite users with member role
+</Accordion>
+
+<Accordion title="Member">
+**Priority**: 100  
+**Key**: `member`
+
+Basic user access. Can:
+- View assigned meetings
+- Participate in meetings
+- Access own profile
+- View org unit information
+</Accordion>
+</AccordionGroup>
+
+### Custom Enterprise Roles
+
+Custom roles are enterprise-specific with `enterpriseId` set to your enterprise ID. You can create custom roles with:
+- Custom names and keys
+- Custom priority levels
+- Enterprise-specific permissions
+
+<Note>
+Custom role creation is not yet available via API but can be configured in the database directly or through the admin panel.
+</Note>
+
+## Role Priority
+
+Roles are sorted by `priority` in descending order:
+
+```javascript
+roles.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+```
+
+**Use cases for priority**:
+- Display roles in dropdown menus (highest first)
+- Determine role hierarchy
+- Restrict role assignment (users can only assign roles with lower priority)
+
+<Tip>
+When assigning roles to users, ensure they cannot assign roles with higher priority than their own role.
+</Tip>
+
+## Common Use Cases
+
+<AccordionGroup>
+<Accordion title="Role Selector Dropdown">
+```javascript
+const { roles } = await fetch('/api/v1/roles', {
+  headers: { 'Authorization': `Bearer ${token}` }
+}).then(r => r.json());
+
+// Create dropdown options
+const roleOptions = roles.map(role => ({
+  value: role.id,
+  label: role.name,
+  key: role.key
+}));
+
+// In React
+<select>
+  {roleOptions.map(opt => (
+    <option key={opt.value} value={opt.value}>
+      {opt.label}
+    </option>
+  ))}
+</select>
+```
+</Accordion>
+
+<Accordion title="Filter by Role Key">
+```javascript
+const { roles } = await fetch('/api/v1/roles', {
+  headers: { 'Authorization': `Bearer ${token}` }
+}).then(r => r.json());
+
+// Find admin role
+const adminRole = roles.find(r => r.key === 'admin');
+console.log('Admin Role ID:', adminRole?.id);
+
+// Get all non-system roles
+const customRoles = roles.filter(r => 
+  !['owner', 'admin', 'member'].includes(r.key)
+);
+```
+</Accordion>
+
+<Accordion title="Role Hierarchy Check">
+```javascript
+const { roles } = await fetch('/api/v1/roles', {
+  headers: { 'Authorization': `Bearer ${token}` }
+}).then(r => r.json());
+
+// Check if a user can assign a role
+function canAssignRole(userRolePriority, targetRolePriority) {
+  return userRolePriority > targetRolePriority;
+}
+
+const userRole = roles.find(r => r.key === 'admin');
+const targetRole = roles.find(r => r.key === 'member');
+
+if (canAssignRole(userRole.priority, targetRole.priority)) {
+  console.log('User can assign this role');
+}
+```
+</Accordion>
+
+<Accordion title="Display User's Highest Role">
+```javascript
+// Assuming user has multiple roles
+const userRoleIds = ['role-member-uuid', 'role-admin-uuid'];
+
+const { roles } = await fetch('/api/v1/roles', {
+  headers: { 'Authorization': `Bearer ${token}` }
+}).then(r => r.json());
+
+// Filter to user's roles and get highest priority
+const userRoles = roles.filter(r => userRoleIds.includes(r.id));
+const highestRole = userRoles.reduce((highest, current) => 
+  (current.priority > highest.priority) ? current : highest
+);
+
+console.log('User\'s highest role:', highestRole.name);
+```
+</Accordion>
+</AccordionGroup>
+
+## Role Keys for API Usage
+
+When using the invite or user management APIs, you can reference roles by their keys:
+
+```javascript
+// Invite user with admin role
+await fetch('/api/v1/auth/invite', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    email: 'newadmin@example.com',
+    name: 'New Admin',
+    roleKeys: ['admin'] // Use role key instead of ID
+  })
+});
+```
+
+<Check>
+**Role keys are more stable than IDs** - They don't change across environments or database resets
+</Check>
+
+## Response Caching
+
+Consider caching the roles response since roles don't change frequently:
+
+```javascript
+// Cache for 1 hour
+let rolesCache = null;
+let cacheTime = null;
+
+async function getRoles() {
+  const now = Date.now();
+  if (rolesCache && cacheTime && (now - cacheTime) < 3600000) {
+    return rolesCache;
+  }
+  
+  const { roles } = await fetch('/api/v1/roles', {
+    headers: { 'Authorization': `Bearer ${token}` }
+  }).then(r => r.json());
+  
+  rolesCache = roles;
+  cacheTime = now;
+  return roles;
+}
+```
+
+## System Role IDs
+
+System roles have fixed UUIDs defined in `src/lib/constants.ts`:
+
+```typescript
+export const SYSTEM_ROLE_IDS = {
+  OWNER: "role-owner-uuid",
+  ADMIN: "role-admin-uuid",
+  MEMBER: "role-member-uuid"
+};
+```
+
+<Warning>
+Don't hardcode these IDs in your application. Always fetch roles dynamically or use role keys instead.
+</Warning>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Invite User" icon="envelope" href="/api-reference/auth/invite">
+  Assign roles when inviting users
+</Card>
+
+<Card title="List Users" icon="users" href="/api-reference/users/list">
+  See users and their assigned roles
+</Card>
+
+<Card title="List Org Units" icon="sitemap" href="/api-reference/org/org-units-list">
+  View organizational structure
+</Card>
+</CardGroup>
+
+
+
+
+
+

@@ -1,0 +1,325 @@
+---
+title: "Create/Update Settings"
+api: "POST /api/v1/settings"
+description: "Create or update enterprise or user-level settings (upsert)"
+icon: "gear"
+---
+
+## Overview
+
+Create a new setting or update an existing one. This endpoint performs an **upsert** operation - it will update an existing setting if one exists with the same `type` for the user/enterprise, or create a new one if it doesn't exist.
+
+## Authentication
+
+<Info>
+This endpoint requires authentication via JWT token (Bearer token or auth cookie).
+</Info>
+
+## Request Body
+
+<ParamField body="type" type="string" required>
+  Setting type identifier (e.g., `"calendar.preferences"`).
+  
+  **Example**: `"calendar.preferences"`
+</ParamField>
+
+<ParamField body="value" type="object" required>
+  Setting value as a JSON object
+  
+  **Example**: 
+  ```json
+  {
+    "calendarConnected": true,
+    "recordingSettings": {
+      "external": true,
+      "internal": true
+    }
+  }
+  ```
+</ParamField>
+
+<Tip>
+The body can also use `Value` or `settings` keys instead of `value` - they're all treated the same way.
+</Tip>
+
+## Response
+
+### Success Response
+
+<ResponseField name="success" type="boolean">
+  Success indicator: `true`
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  The created or updated setting object
+
+  <Expandable title="Setting Object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the setting
+    </ResponseField>
+    
+    <ResponseField name="enterpriseId" type="string">
+      Enterprise ID this setting belongs to
+    </ResponseField>
+    
+    <ResponseField name="userId" type="string">
+      User ID this setting belongs to (null for enterprise-level settings)
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Setting type identifier
+    </ResponseField>
+    
+    <ResponseField name="Value" type="object">
+      Setting value as JSON object
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      ISO 8601 timestamp of when the setting was created
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      ISO 8601 timestamp of when the setting was last updated
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Create Calendar Preferences
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/settings' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_JWT_TOKEN' \
+  -d '{
+    "type": "calendar.preferences",
+    "value": {
+      "calendarConnected": true,
+      "recordingSettings": {
+        "external": true,
+        "internal": true,
+        "calendarInviteRecording": true
+      }
+    }
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/settings', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer YOUR_JWT_TOKEN'
+  },
+  body: JSON.stringify({
+    type: 'calendar.preferences',
+    value: {
+      calendarConnected: true,
+      recordingSettings: {
+        external: true,
+        internal: true,
+        calendarInviteRecording: true
+      }
+    }
+  })
+});
+
+const data = await response.json();
+
+if (data.success) {
+  console.log('Setting created:', data.data);
+}
+```
+
+```python Python
+import requests
+
+response = requests.post(
+  'http://localhost:3001/api/v1/settings',
+  headers={
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer YOUR_JWT_TOKEN'
+  },
+  json={
+    'type': 'calendar.preferences',
+    'value': {
+      'calendarConnected': True,
+      'recordingSettings': {
+        'external': True,
+        'internal': True,
+        'calendarInviteRecording': True
+      }
+    }
+  }
+)
+
+data = response.json()
+
+if data.get('success'):
+  print(f"Setting ID: {data['data']['id']}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "success": true,
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "enterpriseId": "660e8400-e29b-41d4-a716-446655440001",
+    "userId": "770e8400-e29b-41d4-a716-446655440002",
+    "type": "calendar.preferences",
+    "Value": {
+      "calendarConnected": true,
+      "recordingSettings": {
+        "external": true,
+        "internal": true,
+        "calendarInviteRecording": true
+      }
+    },
+    "createdAt": "2024-01-15T10:00:00.000Z",
+    "updatedAt": "2024-01-15T10:00:00.000Z"
+  }
+}
+```
+</ResponseExample>
+
+### Update Existing Setting (Upsert)
+
+If a setting with the same `type` already exists, it will be updated:
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/settings' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_JWT_TOKEN' \
+  -d '{
+    "type": "calendar.preferences",
+    "value": {
+      "calendarConnected": false,
+      "recordingSettings": {
+        "external": false,
+        "internal": false,
+        "calendarInviteRecording": false
+      }
+    }
+  }'
+```
+</RequestExample>
+
+The response will show the updated setting with a new `updatedAt` timestamp.
+
+## Error Responses
+
+<ResponseField name="success" type="boolean">
+  Always `false` for error responses
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Unauthorized">
+```json
+{
+  "success": false,
+  "error": "Invalid or missing token"
+}
+```
+
+No valid authentication token provided.
+</Accordion>
+
+<Accordion title="400 - Missing Type">
+```json
+{
+  "success": false,
+  "error": "type is required"
+}
+```
+
+The `type` field is required in the request body.
+</Accordion>
+
+<Accordion title="400 - Missing Value">
+```json
+{
+  "success": false,
+  "error": "no settings payload provided"
+}
+```
+
+No value, Value, or settings field provided in the request body.
+</Accordion>
+
+<Accordion title="400 - Missing Enterprise ID">
+```json
+{
+  "success": false,
+  "error": "Token missing enterprise_id"
+}
+```
+
+The JWT token doesn't contain an enterprise ID.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "success": false,
+  "error": "Internal server error"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## Upsert Behavior
+
+This endpoint performs an **upsert** operation:
+
+1. If a setting with the same `type` exists for the user/enterprise → Update it
+2. If no setting exists → Create a new one
+
+The lookup is based on:
+- `enterpriseId` (from JWT token)
+- `userId` (from JWT token, or null for enterprise-level settings)
+- `type` (from request body)
+
+## Setting Scope
+
+- **User-level**: Settings are scoped to the specific user (`userId` is extracted from the JWT)
+- **Enterprise-level**: Settings are scoped to the enterprise (`userId` is null)
+
+The API automatically determines the scope based on the authenticated user's context.
+
+## Alternative Field Names
+
+The endpoint accepts any of these field names for the setting value:
+- `value`
+- `Value`
+- `settings`
+
+All are treated identically.
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Get Settings" icon="gear" href="/api-reference/settings/get">
+  Retrieve settings
+</Card>
+
+<Card title="Update Setting" icon="pen" href="/api-reference/settings/put">
+  Update by ID
+</Card>
+
+<Card title="Delete Setting" icon="trash" href="/api-reference/settings/delete">
+  Delete a setting
+</Card>
+</CardGroup>
+
+

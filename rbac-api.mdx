@@ -1,0 +1,304 @@
+---
+title: "API Integration"
+description: "How to integrate RBAC with your applications via API"
+icon: "code"
+---
+
+## API Integration
+
+### Getting User Capabilities
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/iam/capabilities' \
+  -H 'Cookie: auth_token=your_jwt_token_here'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/iam/capabilities', {
+  method: 'GET',
+  credentials: 'include'
+});
+
+const data = await response.json();
+console.log('User capabilities:', data.scoped.permissions);
+```
+
+```python Python
+import requests
+
+cookies = {'auth_token': 'your_jwt_token_here'}
+response = requests.get(
+  'http://localhost:3001/api/v1/iam/capabilities',
+  cookies=cookies
+)
+
+data = response.json()
+print(f"User permissions: {data['scoped']['permissions']}")
+```
+</RequestExample>
+
+### Response Format
+
+The capabilities API returns a structured response:
+
+```json
+{
+  "scoped": {
+    "permissions": {
+      "meeting": {
+        "create": {
+          "enterprise": true,
+          "orgUnits": []
+        },
+        "read": {
+          "enterprise": true,
+          "orgUnits": []
+        },
+        "update": {
+          "enterprise": true,
+          "orgUnits": []
+        },
+        "delete": {
+          "enterprise": true,
+          "orgUnits": []
+        }
+      },
+      "user": {
+        "read": {
+          "enterprise": false,
+          "orgUnits": ["sales-team-id", "marketing-team-id"]
+        }
+      }
+    }
+  }
+}
+```
+
+### Getting Available Roles
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/roles' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/roles', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+
+const data = await response.json();
+console.log('Available roles:', data.roles);
+```
+</RequestExample>
+
+## Server-Side Integration
+
+### Middleware Integration
+
+```typescript
+import { getUserCapabilities } from '@/lib/iam.server';
+
+export function requirePermission(resource: string, action: string) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const capabilities = await getUserCapabilities(userId);
+    const hasPermission = capabilities[resource]?.[action];
+    
+    if (!hasPermission) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    
+    // Add capabilities to request for use in route handlers
+    req.capabilities = capabilities;
+    next();
+  };
+}
+
+// Usage in routes
+app.post('/api/meetings', 
+  requirePermission('meeting', 'create'),
+  createMeetingHandler
+);
+```
+
+### Permission Checking in Route Handlers
+
+```typescript
+export async function createMeeting(req: Request, userId: string) {
+  // Get user's capabilities
+  const capabilities = await getUserCapabilities(userId);
+  
+  // Check if user can create meetings
+  const canCreate = capabilities.meeting?.create;
+  if (!canCreate) {
+    throw new Error('Insufficient permissions to create meetings');
+  }
+  
+  // Check enterprise-wide vs org-unit scoped
+  if (canCreate.enterprise) {
+    // User can create meetings anywhere in enterprise
+    return await createMeetingAnywhere(req.body);
+  } else if (canCreate.orgUnits.length > 0) {
+    // User can only create in specific org units
+    const orgUnitId = req.body.orgUnitId;
+    if (!canCreate.orgUnits.includes(orgUnitId)) {
+      throw new Error('Cannot create meeting in this org unit');
+    }
+    return await createMeetingInOrgUnit(req.body, orgUnitId);
+  }
+  
+  throw new Error('No permission to create meetings');
+}
+```
+
+## Client-Side Integration
+
+### Permission Hook
+
+```typescript
+import { usePermissions } from '@/components/providers/permissions-provider';
+
+function MyComponent() {
+  const { hasAny, scoped, isLoading } = usePermissions();
+
+  // Check if user can create meetings
+  const canCreateMeetings = hasAny('create', 'meeting');
+  
+  // Check if user can update specific org unit
+  const canUpdateOrgUnit = hasAny('update', 'org_unit', { 
+    orgUnitId: 'specific-org-unit-id' 
+  });
+
+  if (isLoading) return <div>Loading permissions...</div>;
+
+  return (
+    <div>
+      {canCreateMeetings && (
+        <button>Create Meeting</button>
+      )}
+      
+      {canUpdateOrgUnit && (
+        <button>Update Org Unit</button>
+      )}
+    </div>
+  );
+}
+```
+
+### Permission Provider Setup
+
+```typescript
+// permissions-provider.tsx
+import { createContext, useContext, useEffect, useState } from 'react';
+
+interface PermissionContextType {
+  scoped: any;
+  hasAny: (action: string, resource: string, context?: any) => boolean;
+  isLoading: boolean;
+}
+
+const PermissionContext = createContext<PermissionContextType | null>(null);
+
+export function PermissionsProvider({ children }: { children: React.ReactNode }) {
+  const [scoped, setScoped] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchCapabilities() {
+      try {
+        const response = await fetch('/api/v1/iam/capabilities', {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        setScoped(data.scoped);
+      } catch (error) {
+        console.error('Failed to fetch capabilities:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchCapabilities();
+  }, []);
+
+  const hasAny = (action: string, resource: string, context?: any) => {
+    if (!scoped?.permissions) return false;
+    
+    const resourcePermissions = scoped.permissions[resource];
+    if (!resourcePermissions) return false;
+    
+    const actionPermission = resourcePermissions[action];
+    if (!actionPermission) return false;
+    
+    // Check enterprise-wide permission
+    if (actionPermission.enterprise) return true;
+    
+    // Check org-unit specific permission
+    if (context?.orgUnitId && actionPermission.orgUnits?.includes(context.orgUnitId)) {
+      return true;
+    }
+    
+    return false;
+  };
+
+  return (
+    <PermissionContext.Provider value={{ scoped, hasAny, isLoading }}>
+      {children}
+    </PermissionContext.Provider>
+  );
+}
+
+export function usePermissions() {
+  const context = useContext(PermissionContext);
+  if (!context) {
+    throw new Error('usePermissions must be used within a PermissionsProvider');
+  }
+  return context;
+}
+```
+
+## Error Handling
+
+### Common API Errors
+
+```typescript
+// Handle permission-related errors
+try {
+  const response = await fetch('/api/meetings', {
+    method: 'POST',
+    body: JSON.stringify(meetingData)
+  });
+  
+  if (response.status === 403) {
+    const error = await response.json();
+    console.error('Permission denied:', error.message);
+    // Show user-friendly error message
+  }
+} catch (error) {
+  console.error('API request failed:', error);
+}
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+<Card title="Frontend Integration" icon="monitor" href="/rbac-frontend">
+  Using permissions in React components
+</Card>
+
+<Card title="Backend Integration" icon="server" href="/rbac-backend">
+  Server-side permission validation
+</Card>
+
+<Card title="API Reference" icon="book" href="/api-reference/iam/capabilities">
+  Complete API documentation
+</Card>
+</CardGroup>

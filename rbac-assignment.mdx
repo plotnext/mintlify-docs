@@ -1,0 +1,332 @@
+---
+title: "Role Assignment"
+description: "How to assign and manage user roles in the RBAC system"
+icon: "user-check"
+---
+
+## Role Assignment
+
+### Inviting Users with Roles
+
+```typescript
+// Invite user with specific roles
+const inviteData = {
+  email: 'newuser@example.com',
+  name: 'New User',
+  roleKeys: ['admin', 'member'], // Can assign multiple roles
+  orgUnitIds: ['sales-team-id'] // Optional: scope to specific org units
+};
+
+const response = await fetch('/api/v1/auth/invite', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify(inviteData)
+});
+```
+
+### Role Hierarchy Enforcement
+
+```typescript
+function canAssignRole(userRolePriority: number, targetRolePriority: number): boolean {
+  // Users can only assign roles with lower priority
+  return userRolePriority > targetRolePriority;
+}
+
+// Example usage
+const currentUserRole = { priority: 500 }; // Admin
+const targetRole = { priority: 100 }; // Member
+
+if (canAssignRole(currentUserRole.priority, targetRole.priority)) {
+  console.log('User can assign this role');
+} else {
+  console.log('User cannot assign this role - insufficient priority');
+}
+```
+
+### Assignment Process
+
+1. **Check Role Priority**: Verify the assigning user has higher priority
+2. **Validate Enterprise Context**: Ensure both users are in the same enterprise
+3. **Set Scope**: Determine if role applies enterprise-wide or to specific org units
+4. **Create Assignment**: Record the role assignment in the database
+
+## Assignment API
+
+### Invite User with Roles
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/auth/invite' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -d '{
+    "email": "newuser@example.com",
+    "name": "New User",
+    "roleKeys": ["member"],
+    "orgUnitIds": ["sales-team-id"]
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/auth/invite', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    email: 'newuser@example.com',
+    name: 'New User',
+    roleKeys: ['member'],
+    orgUnitIds: ['sales-team-id']
+  })
+});
+
+const result = await response.json();
+console.log('User invited:', result);
+```
+</RequestExample>
+
+### Update User Roles
+
+```typescript
+// Update existing user's roles
+const updateData = {
+  userId: 'user-id-here',
+  roleKeys: ['admin', 'member'],
+  orgUnitIds: ['sales-team-id', 'marketing-team-id']
+};
+
+const response = await fetch('/api/v1/users/roles', {
+  method: 'PUT',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify(updateData)
+});
+```
+
+## Assignment Logic
+
+### Role Assignment Validation
+
+```typescript
+export async function validateRoleAssignment(
+  assignerUserId: string,
+  targetUserId: string,
+  roleKeys: string[],
+  orgUnitIds: string[],
+  enterpriseId: string
+): Promise<{ valid: boolean; errors: string[] }> {
+  const errors: string[] = [];
+  
+  // Get assigner's capabilities
+  const assignerCapabilities = await getUserCapabilities(assignerUserId, enterpriseId);
+  const canManageUsers = assignerCapabilities.user?.create;
+  
+  if (!canManageUsers) {
+    errors.push('User does not have permission to assign roles');
+    return { valid: false, errors };
+  }
+  
+  // Get available roles
+  const availableRoles = await getAvailableRoles(enterpriseId);
+  const assignerRole = await getUserHighestRole(assignerUserId, enterpriseId);
+  
+  // Validate each role
+  for (const roleKey of roleKeys) {
+    const role = availableRoles.find(r => r.key === roleKey);
+    
+    if (!role) {
+      errors.push(`Invalid role: ${roleKey}`);
+      continue;
+    }
+    
+    // Check role hierarchy
+    if (assignerRole.priority <= role.priority) {
+      errors.push(`Cannot assign role ${roleKey} - insufficient priority`);
+    }
+  }
+  
+  // Validate org unit assignments
+  if (orgUnitIds.length > 0) {
+    const validOrgUnits = await getValidOrgUnits(enterpriseId);
+    
+    for (const orgUnitId of orgUnitIds) {
+      if (!validOrgUnits.includes(orgUnitId)) {
+        errors.push(`Invalid org unit: ${orgUnitId}`);
+      }
+    }
+  }
+  
+  return { valid: errors.length === 0, errors };
+}
+```
+
+### Creating Role Assignments
+
+```typescript
+export async function createRoleAssignments(
+  userId: string,
+  roleKeys: string[],
+  orgUnitIds: string[],
+  enterpriseId: string
+): Promise<void> {
+  const availableRoles = await getAvailableRoles(enterpriseId);
+  
+  for (const roleKey of roleKeys) {
+    const role = availableRoles.find(r => r.key === roleKey);
+    if (!role) continue;
+    
+    if (orgUnitIds.length === 0) {
+      // Enterprise-wide assignment
+      await createUserRoleAssignment({
+        userId,
+        roleId: role.id,
+        enterpriseId,
+        scopeType: 'enterprise'
+      });
+    } else {
+      // Org-unit specific assignments
+      for (const orgUnitId of orgUnitIds) {
+        await createUserRoleAssignment({
+          userId,
+          roleId: role.id,
+          enterpriseId,
+          orgUnitId,
+          scopeType: 'org_unit'
+        });
+      }
+    }
+  }
+}
+```
+
+## Assignment Scenarios
+
+### Enterprise Administrator
+
+```typescript
+// Admin assigning enterprise-wide roles
+const adminAssignment = {
+  email: 'manager@company.com',
+  name: 'Department Manager',
+  roleKeys: ['admin'],
+  orgUnitIds: [] // Empty = enterprise-wide
+};
+```
+
+### Department Manager
+
+```typescript
+// Manager assigning team-specific roles
+const managerAssignment = {
+  email: 'teamlead@company.com',
+  name: 'Team Lead',
+  roleKeys: ['member'],
+  orgUnitIds: ['engineering-team-id', 'product-team-id']
+};
+```
+
+### Multi-Role Assignment
+
+```typescript
+// User with multiple roles in different org units
+const multiRoleAssignment = {
+  email: 'senior@company.com',
+  name: 'Senior Employee',
+  roleKeys: ['member'],
+  orgUnitIds: ['engineering-team-id', 'sales-team-id', 'marketing-team-id']
+};
+```
+
+## Assignment Management
+
+### List User Assignments
+
+```typescript
+export async function getUserRoleAssignments(userId: string, enterpriseId: string) {
+  const query = `
+    SELECT 
+      ura.*,
+      r.key as role_key,
+      r.name as role_name,
+      r.priority,
+      ou.name as org_unit_name
+    FROM user_role_assignment ura
+    JOIN role r ON ura.role_id = r.id
+    LEFT JOIN org_unit ou ON ura.org_unit_id = ou.id
+    WHERE ura.user_id = $1 AND ura.enterprise_id = $2
+    ORDER BY r.priority DESC
+  `;
+  
+  const result = await db.query(query, [userId, enterpriseId]);
+  return result.rows;
+}
+```
+
+### Remove Role Assignment
+
+```typescript
+export async function removeRoleAssignment(
+  userId: string,
+  roleKey: string,
+  orgUnitId: string | null,
+  enterpriseId: string
+): Promise<void> {
+  const role = await getRoleByKey(roleKey, enterpriseId);
+  if (!role) throw new Error('Role not found');
+  
+  const query = `
+    DELETE FROM user_role_assignment
+    WHERE user_id = $1 
+      AND role_id = $2 
+      AND enterprise_id = $3
+      AND (org_unit_id = $4 OR (org_unit_id IS NULL AND $4 IS NULL))
+  `;
+  
+  await db.query(query, [userId, role.id, enterpriseId, orgUnitId]);
+}
+```
+
+## Best Practices
+
+### Do's
+
+<Check>
+- **Validate role hierarchy**: Always check that the assigner has higher priority than the target role
+- **Use role keys**: Reference roles by keys rather than IDs for stability
+- **Validate org units**: Ensure org units exist and are accessible
+- **Log assignments**: Keep audit trail of role assignments and changes
+- **Batch operations**: Group multiple role assignments for efficiency
+</Check>
+
+### Don'ts
+
+<Warning>
+- **Don't skip validation**: Always validate permissions before creating assignments
+- **Don't hardcode role IDs**: Use role keys for better maintainability
+- **Don't ignore enterprise context**: Ensure all users are in the same enterprise
+- **Don't allow privilege escalation**: Prevent users from assigning roles with higher priority
+- **Don't forget cleanup**: Remove old assignments when updating user roles
+</Warning>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+<Card title="Role Hierarchy" icon="users" href="/rbac-roles">
+  Understanding available roles and their priorities
+</Card>
+
+<Card title="Scoped Permissions" icon="building" href="/rbac-scoping">
+  How role assignments work with org-unit scoping
+</Card>
+
+<Card title="API Reference" icon="book" href="/api-reference/auth/invite">
+  Complete API documentation for user invitations
+</Card>
+</CardGroup>

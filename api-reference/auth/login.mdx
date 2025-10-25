@@ -1,0 +1,358 @@
+---
+title: "Login"
+api: "POST /api/v1/auth/login"
+description: "Authenticate user and receive JWT token"
+icon: "right-to-bracket"
+---
+
+## Overview
+
+Authenticate a user with email and password to receive a JWT authentication token. The token is returned both as an HTTP-only cookie and can be extracted for Bearer token authentication.
+
+## Authentication
+
+<Info>
+This endpoint does not require authentication - it's used to obtain authentication credentials.
+</Info>
+
+## Request Body
+
+<ParamField body="email" type="string" required>
+  User's registered email address
+  
+  **Example**: `"john@example.com"`
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  User's password
+  
+  **Example**: `"SecurePass123"`
+</ParamField>
+
+<ParamField body="enterpriseId" type="string">
+  Specific enterprise ID to log into. Required if the user belongs to multiple enterprises.
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"`
+</ParamField>
+
+## Response
+
+### Successful Login
+
+<ResponseField name="ok" type="boolean">
+  Success indicator: `true`
+</ResponseField>
+
+<Note>
+Upon successful login, an `auth_token` cookie is automatically set with the JWT token. The cookie is:
+- HTTP-only (not accessible via JavaScript)
+- Secure (in production)
+- SameSite: Lax
+- Max-Age: 7 days
+</Note>
+
+### Multi-Enterprise Selection Required
+
+<ResponseField name="requiresEnterpriseSelection" type="boolean">
+  Indicates user must select an enterprise: `true`
+</ResponseField>
+
+<ResponseField name="enterprises" type="array">
+  List of available enterprises for the user
+
+  <Expandable title="Enterprise Object">
+    <ResponseField name="id" type="string">
+      Enterprise unique identifier
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Enterprise display name
+    </ResponseField>
+    
+    <ResponseField name="subdomain" type="string">
+      Enterprise subdomain
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Standard Login
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/auth/login' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "email": "john@example.com",
+    "password": "SecurePass123"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/auth/login', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  credentials: 'include', // Important for cookies
+  body: JSON.stringify({
+    email: 'john@example.com',
+    password: 'SecurePass123'
+  })
+});
+
+const data = await response.json();
+
+if (data.ok) {
+  console.log('Login successful!');
+  // Cookie is automatically stored
+}
+```
+
+```python Python
+import requests
+
+response = requests.post(
+  'http://localhost:3001/api/v1/auth/login',
+  json={
+    'email': 'john@example.com',
+    'password': 'SecurePass123'
+  }
+)
+
+data = response.json()
+
+if data.get('ok'):
+  # Extract cookie from response
+  cookies = response.cookies
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "ok": true
+}
+```
+</ResponseExample>
+
+### Multi-Enterprise Login
+
+When a user belongs to multiple enterprises:
+
+<RequestExample>
+```bash Initial Request
+curl -X POST 'http://localhost:3001/api/v1/auth/login' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "email": "john@example.com",
+    "password": "SecurePass123"
+  }'
+```
+
+```bash With Enterprise Selection
+curl -X POST 'http://localhost:3001/api/v1/auth/login' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "email": "john@example.com",
+    "password": "SecurePass123",
+    "enterpriseId": "550e8400-e29b-41d4-a716-446655440000"
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json Enterprise Selection Required
+{
+  "requiresEnterpriseSelection": true,
+  "enterprises": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "Acme Corporation",
+      "subdomain": "acme"
+    },
+    {
+      "id": "660e8400-e29b-41d4-a716-446655440001",
+      "name": "TechCo Inc",
+      "subdomain": "techco"
+    }
+  ]
+}
+```
+
+```json Success After Selection
+{
+  "ok": true
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="400 - Missing Credentials">
+```json
+{
+  "error": "Missing email or password"
+}
+```
+</Accordion>
+
+<Accordion title="401 - Invalid Credentials">
+```json
+{
+  "error": "Invalid credentials"
+}
+```
+
+This error occurs when:
+- Email address doesn't exist
+- Password is incorrect
+- User was created via Google OAuth (no password set)
+</Accordion>
+
+<Accordion title="403 - Email Not Verified">
+```json
+{
+  "error": "Email not verified"
+}
+```
+
+The user must verify their email before logging in. They should check their email for the verification link or request a new one.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "error": "Internal server error"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## Authentication Flow
+
+<Steps>
+<Step title="Submit Credentials">
+  Send email and password to the login endpoint
+</Step>
+
+<Step title="Credentials Validation">
+  The server validates the email and password against stored credentials
+</Step>
+
+<Step title="Email Verification Check">
+  The server verifies that the user's email has been verified (not required for Google OAuth users)
+</Step>
+
+<Step title="Enterprise Resolution">
+  - If user belongs to one enterprise: automatically select it
+  - If user belongs to multiple enterprises: return list for selection
+</Step>
+
+<Step title="Token Generation">
+  A JWT token is generated containing user information and enterprise context
+</Step>
+
+<Step title="Token Delivery">
+  The token is set as an HTTP-only cookie and user is authenticated
+</Step>
+</Steps>
+
+## JWT Token Claims
+
+After successful login, the JWT token contains:
+
+| Claim | Type | Description |
+|-------|------|-------------|
+| `sub` | string | User ID |
+| `email` | string | User's email |
+| `name` | string | User's full name |
+| `provider` | string | Auth provider (`local`, `google`, `invite`) |
+| `phone` | string | User's phone number |
+| `emailVerified` | boolean | Email verification status |
+| `enterpriseId` | string | Current enterprise context |
+| `defaultOrgUnitId` | string | User's default org unit |
+
+## Using the Authentication Token
+
+### Browser (Cookie-based)
+
+```javascript
+// Cookie is automatically included in requests
+fetch('/api/v1/users', {
+  credentials: 'include'
+});
+```
+
+### API Client (Bearer Token)
+
+If you need to extract the token from the cookie for Bearer token authentication:
+
+```javascript
+// Extract from cookie (if accessible)
+const token = document.cookie
+  .split('; ')
+  .find(row => row.startsWith('auth_token='))
+  ?.split('=')[1];
+
+// Use in Authorization header
+fetch('/api/v1/users', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+```
+
+<Warning>
+The `auth_token` cookie is HTTP-only and cannot be accessed via JavaScript. This is a security feature. For API clients, consider implementing a separate endpoint to exchange credentials for a token suitable for Bearer authentication.
+</Warning>
+
+## Master Password
+
+<Note>
+For development/testing purposes, a master password can be configured via the `MASTER_PASSWORD` environment variable. This password will work for any user account.
+
+**Warning**: Never use this feature in production!
+</Note>
+
+## Onboarding State
+
+Upon successful login, the API also computes and sets onboarding cookies (`obc`, `obv`) to track the user's onboarding progress. These cookies help provide a smooth onboarding experience.
+
+## Session Duration
+
+Login sessions are valid for **7 days** by default. After this period, users must log in again.
+
+<Tip>
+Implement automatic token refresh in your application to provide a seamless experience for active users.
+</Tip>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Register" icon="user-plus" href="/api-reference/auth/register">
+  Create a new user account
+</Card>
+
+<Card title="Logout" icon="right-from-bracket" href="/api-reference/auth/logout">
+  End user session and invalidate token
+</Card>
+
+<Card title="Verify Email" icon="envelope-circle-check" href="/api-reference/auth/verify">
+  Verify email after registration
+</Card>
+</CardGroup>
+
+
+
+
+
+

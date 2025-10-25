@@ -1,0 +1,385 @@
+---
+title: "Logout"
+api: "POST /api/v1/auth/logout"
+description: "End user session and clear authentication"
+icon: "right-from-bracket"
+---
+
+## Overview
+
+End the current user session by clearing the authentication cookie. This endpoint should be called when users want to log out of the application.
+
+<Note>
+Currently, this endpoint clears the client-side authentication cookie. JWT tokens remain valid until expiration (7 days), but are no longer accessible to the client.
+</Note>
+
+## Authentication
+
+<Warning>
+This endpoint requires authentication. Include your JWT token in the request.
+</Warning>
+
+Provide authentication via:
+- **Authorization header**: `Authorization: Bearer YOUR_TOKEN`
+- **Cookie**: `auth_token` (automatically included in browser requests)
+
+## Request
+
+No request body required.
+
+## Response
+
+<ResponseField name="ok" type="boolean">
+  Success indicator: `true`
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success message: `"Logged out successfully"`
+</ResponseField>
+
+<Note>
+Upon successful logout, the `auth_token` cookie is cleared by setting its expiration to the past.
+</Note>
+
+## Examples
+
+### Browser (Cookie-based)
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/auth/logout' \
+  -H 'Cookie: auth_token=YOUR_TOKEN'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/auth/logout', {
+  method: 'POST',
+  credentials: 'include' // Important for cookies
+});
+
+const data = await response.json();
+
+if (data.ok) {
+  console.log('Logged out successfully');
+  // Redirect to login page
+  window.location.href = '/login';
+}
+```
+
+```python Python
+import requests
+
+response = requests.post(
+  'http://localhost:3001/api/v1/auth/logout',
+  cookies={'auth_token': token}
+)
+
+data = response.json()
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "ok": true,
+  "message": "Logged out successfully"
+}
+```
+</ResponseExample>
+
+### API Client (Bearer Token)
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/auth/logout' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/auth/logout', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+
+const data = await response.json();
+
+if (data.ok) {
+  // Clear token from storage
+  localStorage.removeItem('auth_token');
+  // or sessionStorage.removeItem('auth_token');
+  
+  // Redirect to login
+  window.location.href = '/login';
+}
+```
+</RequestExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Unauthorized">
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+No authentication token provided or token is invalid.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "error": "Internal server error"
+}
+```
+
+An unexpected error occurred during logout.
+</Accordion>
+</AccordionGroup>
+
+## Logout Flow
+
+<Steps>
+<Step title="Receive Logout Request">
+  Server receives POST request to `/api/v1/auth/logout`
+</Step>
+
+<Step title="Validate Authentication">
+  Verifies that the request includes a valid authentication token (optional, but recommended)
+</Step>
+
+<Step title="Clear Cookie">
+  Sets the `auth_token` cookie with:
+  - Empty value
+  - Expired date (in the past)
+  - Same path and domain as original cookie
+</Step>
+
+<Step title="Return Success">
+  Returns success response to client
+</Step>
+</Steps>
+
+## Cookie Clearing
+
+When logout is successful, the response includes a `Set-Cookie` header that clears the auth cookie:
+
+```
+Set-Cookie: auth_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly
+```
+
+This ensures:
+- Cookie is deleted from the browser
+- No authentication token remains in client storage
+- User must log in again to access protected resources
+
+## Client-Side Cleanup
+
+In addition to calling the logout endpoint, you should also clear any client-side stored data:
+
+### Local Storage
+
+```javascript
+// Clear any stored tokens
+localStorage.removeItem('auth_token');
+localStorage.removeItem('user');
+localStorage.removeItem('preferences');
+
+// Or clear all
+localStorage.clear();
+```
+
+### Session Storage
+
+```javascript
+sessionStorage.clear();
+```
+
+### Redux/State Management
+
+```javascript
+// Reset your app state
+dispatch({ type: 'LOGOUT' });
+// or
+store.reset();
+```
+
+## Post-Logout Actions
+
+After successful logout:
+
+<Check>
+**Redirect to Login**: Send user to the login page
+</Check>
+
+<Check>
+**Clear Client State**: Remove all user data from client-side storage
+</Check>
+
+<Check>
+**Clear Cache**: Clear any cached API responses
+</Check>
+
+<Check>
+**Show Confirmation**: Display a logout success message
+</Check>
+
+<Check>
+**Cleanup Subscriptions**: Close any WebSocket connections or polling intervals
+</Check>
+
+## Token Validity After Logout
+
+<Warning>
+**Important**: JWT tokens remain valid until their expiration time (7 days from issue). The logout endpoint only clears the cookie from the client side.
+
+For enhanced security, consider implementing server-side token revocation (e.g., using a token blacklist or refresh token rotation).
+</Warning>
+
+## Complete Logout Example
+
+```javascript
+async function logout() {
+  try {
+    // Call logout endpoint
+    const response = await fetch('/api/v1/auth/logout', {
+      method: 'POST',
+      credentials: 'include'
+    });
+    
+    const data = await response.json();
+    
+    if (data.ok) {
+      // Clear local storage
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Reset app state (example with Redux)
+      store.dispatch({ type: 'RESET' });
+      
+      // Show success message
+      showNotification('Logged out successfully');
+      
+      // Redirect to login
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 500);
+    } else {
+      throw new Error('Logout failed');
+    }
+  } catch (error) {
+    console.error('Logout error:', error);
+    // Even if logout fails, clear local data and redirect
+    localStorage.clear();
+    window.location.href = '/login';
+  }
+}
+
+// Attach to logout button
+document.getElementById('logout-btn')?.addEventListener('click', logout);
+```
+
+## Automatic Logout Scenarios
+
+Consider implementing automatic logout in these scenarios:
+
+<AccordionGroup>
+<Accordion title="Token Expiration">
+When the JWT token expires (after 7 days), automatically log the user out and redirect to login.
+
+```javascript
+function checkTokenExpiration() {
+  const token = getToken();
+  if (token) {
+    const decoded = jwt_decode(token);
+    if (decoded.exp * 1000 < Date.now()) {
+      logout();
+    }
+  }
+}
+```
+</Accordion>
+
+<Accordion title="Inactivity Timeout">
+Log out users after a period of inactivity (e.g., 30 minutes).
+
+```javascript
+let inactivityTimer;
+
+function resetInactivityTimer() {
+  clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(logout, 30 * 60 * 1000); // 30 minutes
+}
+
+// Reset on user activity
+document.addEventListener('mousemove', resetInactivityTimer);
+document.addEventListener('keypress', resetInactivityTimer);
+```
+</Accordion>
+
+<Accordion title="401 Response">
+Automatically log out when receiving a 401 Unauthorized response from any API endpoint.
+
+```javascript
+// Axios interceptor example
+axios.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response?.status === 401) {
+      logout();
+    }
+    return Promise.reject(error);
+  }
+);
+```
+</Accordion>
+</AccordionGroup>
+
+## Security Best Practices
+
+<Check>
+**Always Clear Client State**: Remove all user data from client-side storage
+</Check>
+
+<Check>
+**Redirect After Logout**: Ensure user is sent to login page or public area
+</Check>
+
+<Check>
+**Handle Logout Errors**: Even if logout fails, clear client data and redirect
+</Check>
+
+<Check>
+**Inform User**: Show clear feedback that logout was successful
+</Check>
+
+<Check>
+**Close Connections**: Terminate any active WebSocket connections or long-polling
+</Check>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Login" icon="right-to-bracket" href="/api-reference/auth/login">
+  Log back in after logout
+</Card>
+
+<Card title="Register" icon="user-plus" href="/api-reference/auth/register">
+  Create a new account
+</Card>
+</CardGroup>
+
+
+
+
+
+

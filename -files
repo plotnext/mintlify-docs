@@ -1,0 +1,57 @@
+[33mcommit 32b7c38a2d94aa65dcc32dbd0e396bb515b69a1f[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: Titiksha <titikshas12@gmail.com>
+Date:   Sat Oct 25 21:51:31 2025 +0530
+
+    Added all doc files
+
+ai-tools/claude-code.mdx
+ai-tools/cursor.mdx
+ai-tools/windsurf.mdx
+api-reference/auth/invite-accept.mdx
+api-reference/auth/invite.mdx
+api-reference/auth/login.mdx
+api-reference/auth/logout.mdx
+api-reference/auth/me.mdx
+api-reference/auth/register.mdx
+api-reference/auth/resend.mdx
+api-reference/auth/select-enterprise.mdx
+api-reference/auth/verify-google-token.mdx
+api-reference/auth/verify.mdx
+api-reference/authentication.mdx
+api-reference/calendar/create.mdx
+api-reference/endpoint/create.mdx
+api-reference/endpoint/delete.mdx
+api-reference/endpoint/get.mdx
+api-reference/endpoint/webhook.mdx
+api-reference/events/list.mdx
+api-reference/iam/capabilities.mdx
+api-reference/introduction.mdx
+api-reference/meetings/create.mdx
+api-reference/meetings/get.mdx
+api-reference/meetings/list.mdx
+api-reference/meetings/participants.mdx
+api-reference/meetings/recording.mdx
+api-reference/meetings/transcript.mdx
+api-reference/org/org-units-create.mdx
+api-reference/org/org-units-delete.mdx
+api-reference/org/org-units-get.mdx
+api-reference/org/org-units-list.mdx
+api-reference/org/org-units-update.mdx
+api-reference/org/roles.mdx
+api-reference/settings/delete.mdx
+api-reference/settings/get.mdx
+api-reference/settings/post.mdx
+api-reference/settings/put.mdx
+api-reference/users/list.mdx
+docs.json
+openapi.json
+rbac-api.mdx
+rbac-assignment.mdx
+rbac-backend.mdx
+rbac-database.mdx
+rbac-frontend.mdx
+rbac-overview.mdx
+rbac-permissions.mdx
+rbac-roles.mdx
+rbac-scoping.mdx
+rbac-troubleshooting.mdx

@@ -1,0 +1,220 @@
+---
+title: "Delete Organizational Unit"
+api: "DELETE /api/v1/org-units/[id]"
+description: "Delete a specific organizational unit"
+icon: "trash"
+---
+
+## Overview
+
+Delete a specific organizational unit by ID. This operation removes the org unit and all its closure table entries. The org unit must not have any child units to be deleted.
+
+## Authentication
+
+<Info>
+This endpoint requires authentication via JWT token (Bearer token or auth cookie).
+</Info>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Organizational unit ID (must be a valid UUID)
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"`
+</ParamField>
+
+## Response
+
+### Success Response
+
+<ResponseField name="message" type="string">
+  Success message: `"Org unit deleted successfully"`
+</ResponseField>
+
+## Examples
+
+### Delete Organizational Unit
+
+<RequestExample>
+```bash cURL
+curl -X DELETE 'http://localhost:3001/api/v1/org-units/550e8400-e29b-41d4-a716-446655440000' \
+  -H 'Authorization: Bearer your_jwt_token_here'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/org-units/550e8400-e29b-41d4-a716-446655440000', {
+  method: 'DELETE',
+  headers: {
+    'Authorization': 'Bearer your_jwt_token_here'
+  }
+});
+
+const data = await response.json();
+
+if (data.message) {
+  console.log('Success:', data.message);
+} else {
+  console.error('Error:', data.error);
+}
+```
+
+```python Python
+import requests
+
+response = requests.delete(
+  'http://localhost:3001/api/v1/org-units/550e8400-e29b-41d4-a716-446655440000',
+  headers={'Authorization': 'Bearer your_jwt_token_here'}
+)
+
+data = response.json()
+
+if 'message' in data:
+  print(f"Success: {data['message']}")
+else:
+  print(f"Error: {data['error']}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "message": "Org unit deleted successfully"
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Unauthorized">
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+No valid authentication token provided.
+</Accordion>
+
+<Accordion title="404 - Org Unit Not Found">
+```json
+{
+  "error": "Org unit not found"
+}
+```
+
+The organizational unit doesn't exist or doesn't belong to the user's enterprise.
+</Accordion>
+
+<Accordion title="403 - Forbidden">
+```json
+{
+  "error": "Forbidden"
+}
+```
+
+User doesn't have permission to delete this organizational unit.
+</Accordion>
+
+<Accordion title="400 - Has Children">
+```json
+{
+  "error": "Cannot delete org unit with children. Delete children first or reassign them."
+}
+```
+
+The organizational unit has child units that must be deleted or reassigned first.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "error": "Internal server error"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## Permission Requirements
+
+The user must have:
+- **org_unit.delete** permission for the specific organizational unit
+- Valid authentication token with enterprise context
+
+## Deletion Rules
+
+1. **Child Units**: The org unit must not have any child units
+2. **Enterprise Scope**: Only org units within the user's enterprise can be deleted
+3. **Cascade Deletion**: Closure table entries are automatically removed
+4. **User Assignments**: User assignments to the deleted org unit are automatically cleaned up
+
+## Deletion Process
+
+<Steps>
+<Step title="Authentication">
+  Verify user authentication and enterprise context
+</Step>
+
+<Step title="Permission Check">
+  Check if user has delete permission for this org unit
+</Step>
+
+<Step title="Existence Verification">
+  Verify the org unit exists and belongs to the enterprise
+</Step>
+
+<Step title="Child Check">
+  Ensure the org unit has no child units
+</Step>
+
+<Step title="Deletion">
+  Delete the org unit and cascade closure table entries
+</Step>
+
+<Step title="Cleanup">
+  Remove any user assignments to the deleted org unit
+</Step>
+</Steps>
+
+## Use Cases
+
+- **Organizational Restructuring**: Remove departments that are no longer needed
+- **Cleanup**: Remove test or temporary organizational units
+- **Reorganization**: Delete units before creating new structure
+- **Administrative Tasks**: Maintain clean organizational hierarchy
+
+## Important Considerations
+
+<Warning>
+Deleting an organizational unit is irreversible. Make sure to:
+- Move or delete all child units first
+- Reassign users to other organizational units if needed
+- Consider the impact on existing meetings and permissions
+- Backup important data before deletion
+</Warning>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Get Org Unit" icon="building" href="/api-reference/org/org-units-get">
+  Get organizational unit details
+</Card>
+
+<Card title="Update Org Unit" icon="edit" href="/api-reference/org/org-units-update">
+  Update organizational unit information
+</Card>
+
+<Card title="List Org Units" icon="list" href="/api-reference/org/org-units-list">
+  View all organizational units
+</Card>
+
+<Card title="Create Org Unit" icon="plus" href="/api-reference/org/org-units-create">
+  Create new organizational units
+</Card>
+</CardGroup>

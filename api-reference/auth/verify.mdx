@@ -1,0 +1,353 @@
+---
+title: "Verify Email"
+api: "GET /api/v1/auth/verify"
+description: "Verify user email address after registration"
+icon: "envelope-circle-check"
+---
+
+## Overview
+
+Verify a user's email address using the verification token sent during registration. This endpoint is typically accessed by clicking the verification link in the registration email.
+
+<Note>
+This endpoint is usually called automatically when users click the verification link in their email. Manual API calls are rarely needed.
+</Note>
+
+## Authentication
+
+<Info>
+This endpoint does not require authentication - the verification token in the query parameter serves as proof of email ownership.
+</Info>
+
+## Query Parameters
+
+<ParamField query="token" type="string" required>
+  Verification token sent to the user's email address during registration.
+  
+  **Format**: JWT with purpose `"verify"`
+  
+  **Validity**: 15 minutes
+  
+  **Example**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+</ParamField>
+
+## Response
+
+The endpoint returns an HTML page (not JSON) with the verification result:
+
+### Success
+Displays a success message and may redirect to the login page or dashboard.
+
+### Error
+Displays an error message explaining why verification failed.
+
+## Examples
+
+### Email Link (Typical Usage)
+
+Users receive an email with a link like:
+
+```
+http://localhost:3001/api/v1/auth/verify?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+Clicking this link verifies their email.
+
+### Programmatic Verification
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/auth/verify?token=VERIFICATION_TOKEN'
+```
+
+```javascript JavaScript
+const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+const response = await fetch(`/api/v1/auth/verify?token=${token}`);
+
+// Response is HTML, not JSON
+const html = await response.text();
+```
+
+```python Python
+import requests
+
+token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+response = requests.get(
+  f'http://localhost:3001/api/v1/auth/verify',
+  params={'token': token}
+)
+
+# Response is HTML
+html = response.text
+```
+</RequestExample>
+
+<ResponseExample>
+```html Success Response
+<!DOCTYPE html>
+<html>
+<head><title>Email Verified</title></head>
+<body>
+  <h1>Email Verified Successfully!</h1>
+  <p>Your email has been verified. You can now log in.</p>
+  <a href="/login">Go to Login</a>
+</body>
+</html>
+```
+
+```html Error Response
+<!DOCTYPE html>
+<html>
+<head><title>Verification Failed</title></head>
+<body>
+  <h1>Verification Failed</h1>
+  <p>This verification link is invalid or has expired.</p>
+  <a href="/resend">Request New Link</a>
+</body>
+</html>
+```
+</ResponseExample>
+
+## Verification Process
+
+<Steps>
+<Step title="Token Validation">
+  The server validates the JWT token:
+  - Checks signature
+  - Verifies expiration (must be within 15 minutes)
+  - Validates purpose is `"verify"`
+</Step>
+
+<Step title="Code Hash Verification">
+  Looks up the verification code in the database and verifies the hash matches the token.
+</Step>
+
+<Step title="Update User Record">
+  If valid, sets the user's `emailVerifiedAt` timestamp to the current date/time.
+</Step>
+
+<Step title="Cleanup">
+  Deletes the used verification code from the database.
+</Step>
+
+<Step title="Response">
+  Returns success page or error message.
+</Step>
+</Steps>
+
+## Verification Token Structure
+
+The verification token is a JWT containing:
+
+<ParamField body="purpose" type="string" required>
+  Must be `"verify"` for email verification tokens
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Email address being verified
+</ParamField>
+
+<ParamField body="userId" type="string" required>
+  ID of the user whose email is being verified
+</ParamField>
+
+<ParamField body="exp" type="number" required>
+  Expiration timestamp (15 minutes from issuance)
+</ParamField>
+
+## Error Conditions
+
+### Invalid Token
+
+The verification fails if:
+
+<AccordionGroup>
+<Accordion title="Token Expired">
+The verification link is only valid for **15 minutes**. After that, users must request a new verification email.
+
+**Solution**: Use the resend verification endpoint to get a new link.
+</Accordion>
+
+<Accordion title="Token Already Used">
+Each verification token can only be used once. If the email is already verified, users can proceed to login.
+
+**Solution**: Direct user to login page.
+</Accordion>
+
+<Accordion title="Invalid Signature">
+The token has been tampered with or is malformed.
+
+**Solution**: Request a new verification email.
+</Accordion>
+
+<Accordion title="Wrong Purpose">
+The token was issued for a different purpose (e.g., password reset instead of email verification).
+
+**Solution**: Ensure you're using the correct link from the registration email.
+</Accordion>
+
+<Accordion title="User Not Found">
+The user ID in the token doesn't exist in the database.
+
+**Solution**: User may need to register again.
+</Accordion>
+</AccordionGroup>
+
+## After Verification
+
+Once email is verified, users can:
+
+<Check>
+**Log in**: Use the login endpoint with their email and password
+</Check>
+
+<Check>
+**Access protected endpoints**: Make authenticated API requests
+</Check>
+
+<Check>
+**Full account access**: Access all features of their account
+</Check>
+
+## Verification Email
+
+During registration, users receive an email with:
+
+**Subject**: "Verify your email"
+
+**Body**:
+```
+Click this link to verify your email address:
+http://localhost:3001/api/v1/auth/verify?token=VERIFICATION_TOKEN
+
+This link expires in 15 minutes. If you did not request this, you can safely ignore this email.
+```
+
+<Tip>
+Make sure your email service provider (Resend) is properly configured with a verified sending domain for reliable email delivery.
+</Tip>
+
+## Resending Verification Email
+
+If the verification link expires, users can request a new one:
+
+<Card title="Resend Verification" icon="rotate" href="/api-reference/auth/resend">
+  Request a new verification email
+</Card>
+
+## Best Practices
+
+<Check>
+**Clear Instructions**: Provide clear instructions in your registration flow about checking email
+</Check>
+
+<Check>
+**Spam Folder Reminder**: Remind users to check their spam/junk folder
+</Check>
+
+<Check>
+**Resend Option**: Offer an easy way to resend verification email
+</Check>
+
+<Check>
+**Expiration Notice**: Clearly communicate the 15-minute expiration time
+</Check>
+
+<Check>
+**Success Redirect**: After successful verification, redirect to login with a success message
+</Check>
+
+## Implementation Example
+
+### React Component
+
+```javascript
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+
+function VerifyEmail() {
+  const [searchParams] = useSearchParams();
+  const [status, setStatus] = useState('verifying');
+  
+  useEffect(() => {
+    const token = searchParams.get('token');
+    if (!token) {
+      setStatus('error');
+      return;
+    }
+    
+    // Verification happens on page load via GET request
+    // The server handles it and returns HTML
+    // For a SPA, you might want to call the endpoint with fetch
+    // and parse the response
+    
+    fetch(`/api/v1/auth/verify?token=${token}`)
+      .then(response => {
+        if (response.ok) {
+          setStatus('success');
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 2000);
+        } else {
+          setStatus('error');
+        }
+      })
+      .catch(() => setStatus('error'));
+  }, [searchParams]);
+  
+  return (
+    <div>
+      {status === 'verifying' && <p>Verifying your email...</p>}
+      {status === 'success' && <p>Email verified! Redirecting to login...</p>}
+      {status === 'error' && (
+        <div>
+          <p>Verification failed. Please request a new link.</p>
+          <button onClick={() => window.location.href = '/resend'}>
+            Resend Verification Email
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## Security Considerations
+
+<Warning>
+**Token Security**: Verification tokens are single-use and time-limited to prevent abuse.
+</Warning>
+
+<Check>
+**Hashed Storage**: Token hashes (not plaintext) are stored in the database
+</Check>
+
+<Check>
+**Automatic Cleanup**: Used or expired verification codes are removed from the database
+</Check>
+
+<Check>
+**Rate Limiting**: Consider implementing rate limiting on verification attempts
+</Check>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Register" icon="user-plus" href="/api-reference/auth/register">
+  Registration endpoint that sends verification email
+</Card>
+
+<Card title="Resend Verification" icon="rotate" href="/api-reference/auth/resend">
+  Request a new verification email
+</Card>
+
+<Card title="Login" icon="right-to-bracket" href="/api-reference/auth/login">
+  Login after email verification
+</Card>
+</CardGroup>
+
+
+
+
+
+

@@ -1,0 +1,293 @@
+---
+title: "List Calendar Events"
+api: "GET /api/v1/events"
+description: "Retrieve calendar events from the user's Google Calendar"
+icon: "calendar-days"
+---
+
+## Overview
+
+Fetch a list of calendar events from the authenticated user's primary Google Calendar. This endpoint requires Google OAuth tokens to be configured for the user.
+
+## Authentication
+
+<Info>
+This endpoint requires Google OAuth tokens stored in cookies. The user must have connected their Google Calendar via the OAuth flow.
+</Info>
+
+## Query Parameters
+
+This endpoint currently uses default parameters but may support filtering in future versions:
+- `calendarId`: Always uses `"primary"`
+- `maxResults`: Defaults to `10`
+- `singleEvents`: Always `true`
+- `orderBy`: Always `"startTime"`
+
+## Response
+
+### Success Response
+
+Returns a Google Calendar API events list response:
+
+<ResponseField name="kind" type="string">
+  Resource type: `"calendar#events"`
+</ResponseField>
+
+<ResponseField name="items" type="array">
+  Array of event objects
+
+  <Expandable title="Event Object">
+    <ResponseField name="id" type="string">
+      Unique event ID
+    </ResponseField>
+    
+    <ResponseField name="summary" type="string">
+      Event title/summary
+    </ResponseField>
+    
+    <ResponseField name="description" type="string">
+      Event description
+    </ResponseField>
+    
+    <ResponseField name="start" type="object">
+      Event start time
+
+      <Expandable title="Start Object">
+        <ResponseField name="dateTime" type="string">
+          Start time with timezone (ISO 8601)
+        </ResponseField>
+        
+        <ResponseField name="date" type="string">
+          All-day event date (YYYY-MM-DD)
+        </ResponseField>
+        
+        <ResponseField name="timeZone" type="string">
+          Timezone identifier
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="end" type="object">
+      Event end time (same structure as start)
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Event status (`"confirmed"`, `"tentative"`, `"cancelled"`)
+    </ResponseField>
+    
+    <ResponseField name="htmlLink" type="string">
+      Link to open event in Google Calendar
+    </ResponseField>
+    
+    <ResponseField name="location" type="string">
+      Event location
+    </ResponseField>
+    
+    <ResponseField name="organizer" type="object">
+      Event organizer information
+    </ResponseField>
+    
+    <ResponseField name="attendees" type="array">
+      List of attendees
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="summary" type="string">
+  Summary of the calendar
+</ResponseField>
+
+<ResponseField name="timeZone" type="string">
+  Calendar timezone
+</ResponseField>
+
+## Examples
+
+### List Calendar Events
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/events' \
+  -H 'Cookie: google_tokens={...}'
+```
+
+<Note>
+The `google_tokens` cookie contains the OAuth tokens from the Google OAuth flow.
+</Note>
+
+```javascript JavaScript
+// The google_tokens cookie should already be set from the OAuth flow
+const response = await fetch('/api/v1/events', {
+  credentials: 'include' // Important: include cookies
+});
+
+const data = await response.json();
+
+if (data.items) {
+  console.log(`Found ${data.items.length} events`);
+  data.items.forEach(event => {
+    console.log(`Event: ${event.summary}`);
+  });
+}
+```
+
+```python Python
+import requests
+
+# You need to have the google_tokens cookie set
+response = requests.get(
+  'http://localhost:3001/api/v1/events',
+  cookies={'google_tokens': '...'}  # Set from OAuth callback
+)
+
+data = response.json()
+
+if 'items' in data:
+  print(f"Found {len(data['items'])} events")
+  for event in data['items']:
+    print(f"Event: {event.get('summary', 'No title')}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "kind": "calendar#events",
+  "items": [
+    {
+      "id": "event123",
+      "summary": "Team Meeting",
+      "description": "Weekly standup",
+      "start": {
+        "dateTime": "2024-01-15T10:00:00-08:00",
+        "timeZone": "America/Los_Angeles"
+      },
+      "end": {
+        "dateTime": "2024-01-15T11:00:00-08:00",
+        "timeZone": "America/Los_Angeles"
+      },
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=...",
+      "location": "Conference Room A",
+      "organizer": {
+        "email": "organizer@example.com",
+        "displayName": "John Doe",
+        "self": true
+      },
+      "attendees": [
+        {
+          "email": "attendee@example.com",
+          "displayName": "Jane Smith",
+          "responseStatus": "accepted"
+        }
+      ]
+    }
+  ],
+  "summary": "john@example.com",
+  "timeZone": "America/Los_Angeles"
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - No Tokens">
+```json
+{
+  "error": "No tokens"
+}
+```
+
+Google OAuth tokens not found in cookies. The user needs to connect their Google Calendar first.
+</Accordion>
+
+<Accordion title="401 - Invalid Tokens">
+```json
+{
+  "error": "Invalid tokens"
+}
+```
+
+The stored OAuth tokens are invalid or expired. The user needs to reconnect their Google Calendar.
+</Accordion>
+
+<Accordion title="500 - Google API Error">
+Various errors from the Google Calendar API, such as:
+- Invalid calendar ID
+- Insufficient permissions
+- Rate limiting
+- Network errors
+</Accordion>
+</AccordionGroup>
+
+## Authentication Flow
+
+Before using this endpoint, users must:
+
+1. **Connect Google Calendar**: Complete the OAuth flow to grant calendar access
+2. **Store Tokens**: OAuth tokens are stored in the `google_tokens` cookie
+3. **Call Endpoint**: Use this endpoint to fetch events with the stored tokens
+
+See [Google Calendar Integration](/api-reference/calendar/create) for the full setup process.
+
+## Token Management
+
+<Warning>
+The `google_tokens` cookie contains sensitive OAuth tokens. It should be:
+- Stored securely (HTTP-only, secure in production)
+- Never exposed in client-side JavaScript
+- Refreshed automatically when expired
+</Warning>
+
+## Event Types
+
+Events can be:
+- **Timed Events**: Have specific start/end times with timezone
+- **All-Day Events**: Span entire days (date only, no time)
+- **Recurring Events**: Part of a recurring series
+- **Cancelled Events**: Marked as cancelled but may still appear in results
+
+## Rate Limiting
+
+<Note>
+This endpoint is subject to Google Calendar API rate limits:
+- 1,000,000 queries per day per user
+- 100 queries per 100 seconds per user
+- 100 queries per 100 seconds per user per calendar
+</Note>
+
+## Use Cases
+
+- Display upcoming meetings in a dashboard
+- Sync events from Google Calendar to internal systems
+- Create meeting records from calendar events
+- Check availability and scheduling conflicts
+- Build calendar integration features
+
+## Integration Notes
+
+This endpoint is typically used in conjunction with:
+- **Calendar Import** (`POST /api/v1/create-calendar`): Import events as meetings
+- **Calendar Status** (`GET /api/v1/calendar-connected`): Check connection status
+- **Google OAuth**: Initiate the OAuth flow
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Import Calendar" icon="calendar-plus" href="/api-reference/calendar/create">
+  Import events as meetings
+</Card>
+
+<Card title="Check Connection" icon="link" href="/api-reference/calendar-connected">
+  Verify calendar connection status
+</Card>
+
+<Card title="Google OAuth" icon="google" href="/api-reference/google/oauth">
+  Connect Google Calendar
+</Card>
+</CardGroup>
+
+

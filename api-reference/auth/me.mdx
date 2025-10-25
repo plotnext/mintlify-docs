@@ -1,0 +1,190 @@
+---
+title: "Get Current User"
+api: "GET /api/v1/auth/me"
+description: "Get current authenticated user information"
+icon: "user"
+---
+
+## Overview
+
+Retrieve the current authenticated user's information from the JWT token stored in the auth cookie.
+
+## Authentication
+
+<Info>
+This endpoint requires authentication via the `auth_token` cookie set during login.
+</Info>
+
+## Request
+
+This endpoint does not require any request body or parameters.
+
+## Response
+
+### Success Response
+
+<ResponseField name="user" type="object">
+  Current user information from JWT token
+
+  <Expandable title="User Object">
+    <ResponseField name="sub" type="string">
+      User ID
+    </ResponseField>
+    
+    <ResponseField name="email" type="string">
+      User's email address
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      User's full name
+    </ResponseField>
+    
+    <ResponseField name="phone" type="string">
+      User's phone number (optional)
+    </ResponseField>
+    
+    <ResponseField name="provider" type="string">
+      Authentication provider (`local`, `google`, `invite`)
+    </ResponseField>
+    
+    <ResponseField name="emailVerified" type="boolean">
+      Email verification status
+    </ResponseField>
+    
+    <ResponseField name="enterpriseId" type="string">
+      Current enterprise context
+    </ResponseField>
+    
+    <ResponseField name="defaultOrgUnitId" type="string">
+      User's default organizational unit ID (optional)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### No Authentication
+
+<ResponseField name="user" type="null">
+  Returns `null` when no valid authentication token is found
+</ResponseField>
+
+## Examples
+
+### Authenticated Request
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/auth/me' \
+  -H 'Cookie: auth_token=your_jwt_token_here'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/auth/me', {
+  method: 'GET',
+  credentials: 'include' // Include cookies
+});
+
+const data = await response.json();
+
+if (data.user) {
+  console.log('User:', data.user.name, data.user.email);
+} else {
+  console.log('Not authenticated');
+}
+```
+
+```python Python
+import requests
+
+# Include the auth token cookie from your login response
+cookies = {'auth_token': 'your_jwt_token_here'}
+
+response = requests.get(
+  'http://localhost:3001/api/v1/auth/me',
+  cookies=cookies
+)
+
+data = response.json()
+
+if data.get('user'):
+  print(f"User: {data['user']['name']} ({data['user']['email']})")
+else:
+  print("Not authenticated")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success - Authenticated
+{
+  "user": {
+    "sub": "550e8400-e29b-41d4-a716-446655440000",
+    "email": "john@example.com",
+    "name": "John Doe",
+    "phone": "+1234567890",
+    "provider": "local",
+    "emailVerified": true,
+    "enterpriseId": "660e8400-e29b-41d4-a716-446655440001",
+    "defaultOrgUnitId": "770e8400-e29b-41d4-a716-446655440002"
+  }
+}
+```
+
+```json No Authentication
+{
+  "user": null
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Invalid Token">
+```json
+{
+  "error": "Invalid token"
+}
+```
+
+This occurs when the JWT token in the cookie is malformed or expired.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "error": "Internal server error"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+- **Check Authentication Status**: Verify if user is logged in
+- **Get User Context**: Retrieve current user's enterprise and org unit
+- **Display User Info**: Show user name, email, and other details in UI
+- **Permission Checks**: Use user ID and enterprise context for authorization
+
+## Security Notes
+
+- The endpoint uses HTTP-only cookies for token storage
+- JWT tokens contain sensitive user information
+- Tokens expire after 7 days and must be refreshed
+- No user data is exposed when authentication fails (returns `null`)
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Login" icon="right-to-bracket" href="/api-reference/auth/login">
+  Authenticate and receive JWT token
+</Card>
+
+<Card title="Logout" icon="right-from-bracket" href="/api-reference/auth/logout">
+  Clear authentication token
+</Card>
+</CardGroup>

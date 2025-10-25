@@ -1,0 +1,272 @@
+---
+title: "Get Meeting Participants"
+api: "GET /api/v1/meetings/[id]/participants"
+description: "Get meeting participants with detailed talk time analysis"
+icon: "users"
+---
+
+## Overview
+
+Retrieve detailed participant information for a specific meeting, including talk time analysis, speaking percentages, and participant engagement metrics.
+
+## Authentication
+
+<Note>
+Authentication is optional for this endpoint. If provided, it will be validated and used for permission checks.
+</Note>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Meeting ID (must be a valid UUID)
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"`
+</ParamField>
+
+## Response
+
+### Success Response
+
+<ResponseField name="success" type="boolean">
+  Success indicator: `true`
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Participant data
+
+  <Expandable title="Data Object">
+    <ResponseField name="meetingId" type="string">
+      Meeting ID
+    </ResponseField>
+    
+    <ResponseField name="participantCount" type="number">
+      Number of participants
+    </ResponseField>
+    
+    <ResponseField name="totalTalkTimeMs" type="number">
+      Total talk time across all participants in milliseconds
+    </ResponseField>
+    
+    <ResponseField name="totalTalkTimeMinutes" type="number">
+      Total talk time in minutes
+    </ResponseField>
+    
+    <ResponseField name="participants" type="array">
+      List of participants with talk time analysis
+
+      <Expandable title="Participant Object">
+        <ResponseField name="id" type="string">
+          Participant ID
+        </ResponseField>
+        
+        <ResponseField name="name" type="string">
+          Participant name (from transcript or user data)
+        </ResponseField>
+        
+        <ResponseField name="talkTimeMs" type="number">
+          Talk time in milliseconds
+        </ResponseField>
+        
+        <ResponseField name="talkTimeMinutes" type="number">
+          Talk time in minutes
+        </ResponseField>
+        
+        <ResponseField name="talkTimeSeconds" type="number">
+          Talk time in seconds
+        </ResponseField>
+        
+        <ResponseField name="talkTimeFormatted" type="string">
+          Formatted talk time (e.g., "5 Min 30 Sec")
+        </ResponseField>
+        
+        <ResponseField name="percentage" type="number">
+          Percentage of total talk time
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Get Meeting Participants
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000/participants' \
+  -H 'Authorization: Bearer your_jwt_token_here'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000/participants', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer your_jwt_token_here'
+  }
+});
+
+const data = await response.json();
+
+if (data.success) {
+  console.log('Total participants:', data.data.participantCount);
+  console.log('Total talk time:', data.data.totalTalkTimeMinutes, 'minutes');
+  
+  data.data.participants.forEach(participant => {
+    console.log(`${participant.name}: ${participant.talkTimeFormatted} (${participant.percentage}%)`);
+  });
+}
+```
+
+```python Python
+import requests
+
+response = requests.get(
+  'http://localhost:3001/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000/participants',
+  headers={'Authorization': 'Bearer your_jwt_token_here'}
+)
+
+data = response.json()
+
+if data.get('success'):
+  participants = data['data']['participants']
+  total_time = data['data']['totalTalkTimeMinutes']
+  
+  print(f"Total participants: {len(participants)}")
+  print(f"Total talk time: {total_time} minutes")
+  
+  for participant in participants:
+    print(f"{participant['name']}: {participant['talkTimeFormatted']} ({participant['percentage']}%)")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "success": true,
+  "data": {
+    "meetingId": "550e8400-e29b-41d4-a716-446655440000",
+    "participantCount": 3,
+    "totalTalkTimeMs": 1650000,
+    "totalTalkTimeMinutes": 27,
+    "participants": [
+      {
+        "id": "speaker-0",
+        "name": "John Doe",
+        "talkTimeMs": 900000,
+        "talkTimeMinutes": 15,
+        "talkTimeSeconds": 0,
+        "talkTimeFormatted": "15 Min 0 Sec",
+        "percentage": 55
+      },
+      {
+        "id": "speaker-1",
+        "name": "Jane Smith",
+        "talkTimeMs": 600000,
+        "talkTimeMinutes": 10,
+        "talkTimeSeconds": 0,
+        "talkTimeFormatted": "10 Min 0 Sec",
+        "percentage": 36
+      },
+      {
+        "id": "speaker-2",
+        "name": "Bob Wilson",
+        "talkTimeMs": 150000,
+        "talkTimeMinutes": 2,
+        "talkTimeSeconds": 30,
+        "talkTimeFormatted": "2 Min 30 Sec",
+        "percentage": 9
+      }
+    ]
+  }
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="400 - Invalid Meeting ID Format">
+```json
+{
+  "error": "Invalid meeting ID format",
+  "message": "Meeting ID must be a valid UUID"
+}
+```
+
+The meeting ID is not a valid UUID format.
+</Accordion>
+
+<Accordion title="404 - Meeting Not Found">
+```json
+{
+  "error": "Meeting not found",
+  "message": "This meeting does not exist"
+}
+```
+
+The meeting doesn't exist.
+</Accordion>
+
+<Accordion title="401 - Invalid Token">
+```json
+{
+  "error": "Invalid token"
+}
+```
+
+The provided authentication token is invalid.
+</Accordion>
+
+<Accordion title="403 - Forbidden">
+```json
+{
+  "error": "Forbidden"
+}
+```
+
+The user doesn't have permission to access this meeting.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "error": "Internal server error",
+  "message": "Failed to fetch participants"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## Data Calculation
+
+Participant data is calculated from transcript segments:
+- **Talk Time**: Sum of all speaking segments for each participant
+- **Percentage**: Individual talk time as percentage of total talk time
+- **Speaker Names**: Resolved from transcript data, user records, or participant records
+- **Ordering**: Participants are ordered by talk time (highest to lowest)
+
+## Use Cases
+
+- **Meeting Analytics**: Analyze speaking patterns and engagement
+- **Participation Reports**: Generate reports on meeting participation
+- **Speaker Identification**: Identify who spoke most/least in meetings
+- **Meeting Efficiency**: Assess if meetings are dominated by certain participants
+- **Training Insights**: Help improve meeting facilitation and participation
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Get Meeting Details" icon="calendar-days" href="/api-reference/meetings/get">
+  Get comprehensive meeting information
+</Card>
+
+<Card title="Get Meeting Transcript" icon="file-text" href="/api-reference/meetings/transcript">
+  Get detailed transcript with speaker information
+</Card>
+</CardGroup>

@@ -1,0 +1,172 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Arali API Documentation",
+  "colors": {
+    "primary": "#16A34A",
+    "light": "#07C983",
+    "dark": "#15803D"
+  },
+  "favicon": "/favicon.svg",
+  "api": {
+    "baseUrl": "http://localhost:3001",
+    "auth": {
+      "method": "bearer",
+      "type": "http"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "RBAC Fundamentals",
+            "pages": [
+              "rbac-overview",
+              "rbac-roles",
+              "rbac-permissions"
+            ]
+          },
+          {
+            "group": "RBAC Implementation", 
+            "pages": [
+              "rbac-api",
+              "rbac-frontend",
+              "rbac-backend"
+            ]
+          },
+          {
+            "group": "RBAC Management",
+            "pages": [
+              "rbac-assignment",
+              "rbac-scoping",
+              "rbac-database",
+              "rbac-troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api-reference/introduction",
+              "api-reference/authentication"
+            ]
+          },
+          {
+            "group": "Authentication",
+            "pages": [
+              "api-reference/auth/register",
+              "api-reference/auth/login",
+              "api-reference/auth/me",
+              "api-reference/auth/resend",
+              "api-reference/auth/select-enterprise",
+              "api-reference/auth/invite",
+              "api-reference/auth/invite-accept",
+              "api-reference/auth/verify",
+              "api-reference/auth/verify-google-token",
+              "api-reference/auth/logout"
+            ]
+          },
+          {
+            "group": "User Management",
+            "pages": [
+              "api-reference/users/list"
+            ]
+          },
+          {
+            "group": "IAM & Permissions",
+            "pages": [
+              "api-reference/iam/capabilities"
+            ]
+          },
+          {
+            "group": "Meetings",
+            "pages": [
+              "api-reference/meetings/create",
+              "api-reference/meetings/list",
+              "api-reference/meetings/get",
+              "api-reference/meetings/participants",
+              "api-reference/meetings/transcript",
+              "api-reference/meetings/recording"
+            ]
+          },
+          {
+            "group": "Calendar",
+            "pages": [
+              "api-reference/calendar/create"
+            ]
+          },
+          {
+            "group": "Settings",
+            "pages": [
+              "api-reference/settings/get",
+              "api-reference/settings/post",
+              "api-reference/settings/put",
+              "api-reference/settings/delete"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "api-reference/events/list"
+            ]
+          },
+          {
+            "group": "Organization",
+            "pages": [
+              "api-reference/org/roles",
+              "api-reference/org/org-units-list",
+              "api-reference/org/org-units-get",
+              "api-reference/org/org-units-create",
+              "api-reference/org/org-units-update",
+              "api-reference/org/org-units-delete"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com",
+          "icon": "github"
+        }
+      ]
+    }
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:support@arali.com"
+      }
+    ]
+  },
+  "contextual": {
+    "options": [
+     "copy",
+     "view",
+     "chatgpt",
+     "claude",
+     "perplexity",
+     "mcp",
+     "cursor",
+     "vscode"
+   ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com"
+    }
+  }
+}

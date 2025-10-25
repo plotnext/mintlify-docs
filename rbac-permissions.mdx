@@ -1,0 +1,183 @@
+---
+title: "Permission Matrix"
+description: "Complete breakdown of resources, actions, and permission distribution"
+icon: "key"
+---
+
+## Permission Matrix
+
+### Resources and Actions
+
+The system defines permissions as **resource-action** pairs:
+
+<AccordionGroup>
+<Accordion title="Meeting Resource">
+- **read**: View meeting details and information
+- **create**: Create new meetings
+- **update**: Modify existing meetings
+- **delete**: Remove meetings
+
+**Permission Distribution**:
+- Administrator: CRUD (4/4)
+- Member: CRU (3/4)
+</Accordion>
+
+<Accordion title="Org Unit Resource">
+- **read**: View organizational units
+- **create**: Create new organizational units
+- **update**: Modify organizational units
+- **delete**: Remove organizational units
+
+**Permission Distribution**:
+- Administrator: CRUD (4/4)
+- Member: R (1/4)
+</Accordion>
+
+<Accordion title="User Resource">
+- **read**: View user information
+- **create**: Create new users
+- **update**: Modify user information
+- **delete**: Remove users
+
+**Permission Distribution**:
+- Administrator: CRUD (4/4)
+- Member: R (1/4)
+</Accordion>
+
+<Accordion title="Role Resource">
+- **read**: View role information
+- **create**: Create new roles
+- **update**: Modify existing roles
+- **delete**: Remove roles
+
+**Permission Distribution**:
+- Administrator: R (1/4)
+- Member: None (0/4)
+</Accordion>
+
+<Accordion title="Enterprise Resource">
+- **read**: View enterprise information
+- **create**: Create new enterprises
+- **update**: Modify enterprise settings
+- **delete**: Remove enterprises
+
+**Permission Distribution**:
+- Administrator: None (0/4)
+- Member: None (0/4)
+</Accordion>
+</AccordionGroup>
+
+## Permission Checking
+
+### Frontend Permission Checking
+
+```typescript
+import { usePermissions } from '@/components/providers/permissions-provider';
+
+function MyComponent() {
+  const { hasAny, scoped, isLoading } = usePermissions();
+
+  // Check if user can create meetings
+  const canCreateMeetings = hasAny('create', 'meeting');
+  
+  // Check if user can update specific org unit
+  const canUpdateOrgUnit = hasAny('update', 'org_unit', { 
+    orgUnitId: 'specific-org-unit-id' 
+  });
+
+  if (isLoading) return <div>Loading permissions...</div>;
+
+  return (
+    <div>
+      {canCreateMeetings && (
+        <button>Create Meeting</button>
+      )}
+      
+      {canUpdateOrgUnit && (
+        <button>Update Org Unit</button>
+      )}
+    </div>
+  );
+}
+```
+
+### Backend Permission Checking
+
+```typescript
+import { getUserCapabilities } from '@/lib/iam.server';
+
+export async function createMeeting(req: Request, userId: string) {
+  // Get user's capabilities
+  const capabilities = await getUserCapabilities(userId);
+  
+  // Check if user can create meetings
+  const canCreate = capabilities.meeting?.create;
+  if (!canCreate) {
+    throw new Error('Insufficient permissions to create meetings');
+  }
+  
+  // Check enterprise-wide vs org-unit scoped
+  if (canCreate.enterprise) {
+    // User can create meetings anywhere in enterprise
+    return await createMeetingAnywhere(req.body);
+  } else if (canCreate.orgUnits.length > 0) {
+    // User can only create in specific org units
+    const orgUnitId = req.body.orgUnitId;
+    if (!canCreate.orgUnits.includes(orgUnitId)) {
+      throw new Error('Cannot create meeting in this org unit');
+    }
+    return await createMeetingInOrgUnit(req.body, orgUnitId);
+  }
+  
+  throw new Error('No permission to create meetings');
+}
+```
+
+## Permission-Based UI Rendering
+
+```typescript
+function MeetingList() {
+  const { hasAny } = usePermissions();
+
+  return (
+    <div>
+      <h2>Meetings</h2>
+      
+      {/* Show create button only if user has permission */}
+      {hasAny('create', 'meeting') && (
+        <button onClick={createMeeting}>
+          Create New Meeting
+        </button>
+      )}
+      
+      {/* Show delete button only for meetings user can delete */}
+      {meetings.map(meeting => (
+        <div key={meeting.id}>
+          <h3>{meeting.title}</h3>
+          {hasAny('delete', 'meeting', { orgUnitId: meeting.orgUnitId }) && (
+            <button onClick={() => deleteMeeting(meeting.id)}>
+              Delete
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+<Card title="Scoped Permissions" icon="building" href="/rbac-scoping">
+  How permissions work with enterprise and org-unit scoping
+</Card>
+
+<Card title="API Integration" icon="code" href="/rbac-api">
+  Getting user capabilities via API
+</Card>
+
+<Card title="Frontend Integration" icon="monitor" href="/rbac-frontend">
+  Using permissions in React components
+</Card>
+</CardGroup>

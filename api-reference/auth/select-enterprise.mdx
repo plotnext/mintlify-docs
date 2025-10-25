@@ -1,0 +1,243 @@
+---
+title: "Select Enterprise"
+api: "POST /api/v1/auth/select-enterprise"
+description: "Select enterprise for multi-enterprise users during login"
+icon: "building"
+---
+
+## Overview
+
+When a user belongs to multiple enterprises, they must select which enterprise to log into. This endpoint completes the authentication process by creating a JWT token with the selected enterprise context.
+
+## Authentication
+
+<Info>
+This endpoint requires authentication - it's used after initial login when enterprise selection is required.
+</Info>
+
+## Request Body
+
+<ParamField body="email" type="string" required>
+  User's email address
+  
+  **Example**: `"john@example.com"`
+</ParamField>
+
+<ParamField body="enterpriseId" type="string" required>
+  ID of the enterprise to log into
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"`
+</ParamField>
+
+<ParamField body="provider" type="string">
+  Authentication provider used (`local`, `google`)
+  
+  **Example**: `"google"`
+</ParamField>
+
+## Response
+
+### Success Response
+
+<ResponseField name="ok" type="boolean">
+  Success indicator: `true`
+</ResponseField>
+
+<Note>
+Upon successful enterprise selection, an `auth_token` cookie is automatically set with the JWT token. The cookie is:
+- HTTP-only (not accessible via JavaScript)
+- Secure (in production)
+- SameSite: Lax
+- Max-Age: 7 days
+</Note>
+
+## Examples
+
+### Select Enterprise After Login
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/auth/select-enterprise' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "email": "john@example.com",
+    "enterpriseId": "550e8400-e29b-41d4-a716-446655440000",
+    "provider": "local"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/auth/select-enterprise', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  credentials: 'include', // Important for cookies
+  body: JSON.stringify({
+    email: 'john@example.com',
+    enterpriseId: '550e8400-e29b-41d4-a716-446655440000',
+    provider: 'local'
+  })
+});
+
+const data = await response.json();
+
+if (data.ok) {
+  console.log('Enterprise selected successfully!');
+  // Cookie is automatically stored
+}
+```
+
+```python Python
+import requests
+
+response = requests.post(
+  'http://localhost:3001/api/v1/auth/select-enterprise',
+  json={
+    'email': 'john@example.com',
+    'enterpriseId': '550e8400-e29b-41d4-a716-446655440000',
+    'provider': 'local'
+  }
+)
+
+data = response.json()
+
+if data.get('ok'):
+  # Extract cookie from response
+  cookies = response.cookies
+  print('Enterprise selected successfully!')
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "ok": true
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="400 - Missing Parameters">
+```json
+{
+  "error": "Missing email or enterpriseId"
+}
+```
+
+Either email or enterpriseId parameter is missing.
+</Accordion>
+
+<Accordion title="404 - User Not Found">
+```json
+{
+  "error": "User not found"
+}
+```
+
+No user exists with the provided email address.
+</Accordion>
+
+<Accordion title="403 - Invalid Enterprise Selection">
+```json
+{
+  "error": "Invalid enterprise selection"
+}
+```
+
+The user does not have access to the selected enterprise.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "error": "Internal server error"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## Multi-Enterprise Login Flow
+
+<Steps>
+<Step title="Initial Login">
+  User logs in with email and password
+</Step>
+
+<Step title="Enterprise Check">
+  System checks if user belongs to multiple enterprises
+</Step>
+
+<Step title="Enterprise Selection Required">
+  If multiple enterprises, return enterprise list for selection
+</Step>
+
+<Step title="User Selects Enterprise">
+  User chooses which enterprise to access
+</Step>
+
+<Step title="Complete Authentication">
+  This endpoint creates JWT token with selected enterprise context
+</Step>
+
+<Step title="Set Auth Cookie">
+  Authentication cookie is set and user is logged in
+</Step>
+</Steps>
+
+## JWT Token Claims
+
+After successful enterprise selection, the JWT token contains:
+
+| Claim | Type | Description |
+|-------|------|-------------|
+| `sub` | string | User ID |
+| `email` | string | User's email |
+| `name` | string | User's full name |
+| `phone` | string | User's phone number |
+| `provider` | string | Auth provider (`local`, `google`, `invite`) |
+| `emailVerified` | boolean | Email verification status |
+| `enterpriseId` | string | Selected enterprise context |
+| `defaultOrgUnitId` | string | User's default org unit in selected enterprise |
+
+## Enterprise Validation
+
+The system validates that:
+- User exists with the provided email
+- User has access to the selected enterprise
+- Enterprise ID is valid and exists
+- User's organizational unit access is preserved
+
+## Use Cases
+
+- **Multi-Company Users**: Users who work for multiple companies
+- **Role-Based Access**: Different permissions per enterprise
+- **Context Switching**: Seamless switching between enterprise contexts
+- **Security**: Ensure users only access authorized enterprises
+
+## Security Considerations
+
+- Enterprise access is validated before token creation
+- JWT tokens are signed and expire after 7 days
+- HTTP-only cookies prevent XSS attacks
+- Enterprise context is embedded in token for authorization
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Login" icon="right-to-bracket" href="/api-reference/auth/login">
+  Initial login that may require enterprise selection
+</Card>
+
+<Card title="Get Current User" icon="user" href="/api-reference/auth/me">
+  Get user info with current enterprise context
+</Card>
+</CardGroup>

@@ -1,0 +1,343 @@
+---
+title: "Frontend Integration"
+description: "Using RBAC permissions in React components and frontend applications"
+icon: "monitor"
+---
+
+## Frontend Integration
+
+### Permission Checking Hook
+
+```typescript
+import { usePermissions } from '@/components/providers/permissions-provider';
+
+function MyComponent() {
+  const { hasAny, scoped, isLoading } = usePermissions();
+
+  // Check if user can create meetings
+  const canCreateMeetings = hasAny('create', 'meeting');
+  
+  // Check if user can update specific org unit
+  const canUpdateOrgUnit = hasAny('update', 'org_unit', { 
+    orgUnitId: 'specific-org-unit-id' 
+  });
+
+  if (isLoading) return <div>Loading permissions...</div>;
+
+  return (
+    <div>
+      {canCreateMeetings && (
+        <button>Create Meeting</button>
+      )}
+      
+      {canUpdateOrgUnit && (
+        <button>Update Org Unit</button>
+      )}
+    </div>
+  );
+}
+```
+
+### Permission-Based UI Rendering
+
+```typescript
+function MeetingList() {
+  const { hasAny } = usePermissions();
+
+  return (
+    <div>
+      <h2>Meetings</h2>
+      
+      {/* Show create button only if user has permission */}
+      {hasAny('create', 'meeting') && (
+        <button onClick={createMeeting}>
+          Create New Meeting
+        </button>
+      )}
+      
+      {/* Show delete button only for meetings user can delete */}
+      {meetings.map(meeting => (
+        <div key={meeting.id}>
+          <h3>{meeting.title}</h3>
+          {hasAny('delete', 'meeting', { orgUnitId: meeting.orgUnitId }) && (
+            <button onClick={() => deleteMeeting(meeting.id)}>
+              Delete
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### Permission Provider Setup
+
+```typescript
+// permissions-provider.tsx
+import { createContext, useContext, useEffect, useState } from 'react';
+
+interface PermissionContextType {
+  scoped: any;
+  hasAny: (action: string, resource: string, context?: any) => boolean;
+  isLoading: boolean;
+}
+
+const PermissionContext = createContext<PermissionContextType | null>(null);
+
+export function PermissionsProvider({ children }: { children: React.ReactNode }) {
+  const [scoped, setScoped] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchCapabilities() {
+      try {
+        const response = await fetch('/api/v1/iam/capabilities', {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        setScoped(data.scoped);
+      } catch (error) {
+        console.error('Failed to fetch capabilities:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchCapabilities();
+  }, []);
+
+  const hasAny = (action: string, resource: string, context?: any) => {
+    if (!scoped?.permissions) return false;
+    
+    const resourcePermissions = scoped.permissions[resource];
+    if (!resourcePermissions) return false;
+    
+    const actionPermission = resourcePermissions[action];
+    if (!actionPermission) return false;
+    
+    // Check enterprise-wide permission
+    if (actionPermission.enterprise) return true;
+    
+    // Check org-unit specific permission
+    if (context?.orgUnitId && actionPermission.orgUnits?.includes(context.orgUnitId)) {
+      return true;
+    }
+    
+    return false;
+  };
+
+  return (
+    <PermissionContext.Provider value={{ scoped, hasAny, isLoading }}>
+      {children}
+    </PermissionContext.Provider>
+  );
+}
+
+export function usePermissions() {
+  const context = useContext(PermissionContext);
+  if (!context) {
+    throw new Error('usePermissions must be used within a PermissionsProvider');
+  }
+  return context;
+}
+```
+
+### App-Level Provider Setup
+
+```typescript
+// app/layout.tsx or _app.tsx
+import { PermissionsProvider } from '@/components/providers/permissions-provider';
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <PermissionsProvider>
+          {children}
+        </PermissionsProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+## Advanced Patterns
+
+### Conditional Component Rendering
+
+```typescript
+function AdminPanel() {
+  const { hasAny } = usePermissions();
+  
+  // Only show admin panel if user has admin permissions
+  if (!hasAny('read', 'role')) {
+    return null;
+  }
+  
+  return (
+    <div className="admin-panel">
+      <h2>Administration</h2>
+      {/* Admin-specific content */}
+    </div>
+  );
+}
+```
+
+### Permission-Based Navigation
+
+```typescript
+function Navigation() {
+  const { hasAny } = usePermissions();
+  
+  const navigationItems = [
+    { path: '/meetings', label: 'Meetings', permission: ['read', 'meeting'] },
+    { path: '/users', label: 'Users', permission: ['read', 'user'] },
+    { path: '/admin', label: 'Admin', permission: ['read', 'role'] },
+  ];
+  
+  const visibleItems = navigationItems.filter(item => 
+    hasAny(item.permission[0], item.permission[1])
+  );
+  
+  return (
+    <nav>
+      {visibleItems.map(item => (
+        <Link key={item.path} href={item.path}>
+          {item.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+```
+
+### Form Field Permissions
+
+```typescript
+function MeetingForm({ meeting }: { meeting?: Meeting }) {
+  const { hasAny } = usePermissions();
+  
+  return (
+    <form>
+      <input 
+        name="title" 
+        defaultValue={meeting?.title}
+        disabled={!hasAny('update', 'meeting')}
+      />
+      
+      {hasAny('delete', 'meeting') && (
+        <button type="button" onClick={deleteMeeting}>
+          Delete Meeting
+        </button>
+      )}
+    </form>
+  );
+}
+```
+
+## Error Handling
+
+### Permission Error States
+
+```typescript
+function ProtectedComponent() {
+  const { hasAny, isLoading } = usePermissions();
+  
+  if (isLoading) {
+    return <div>Loading permissions...</div>;
+  }
+  
+  if (!hasAny('read', 'meeting')) {
+    return (
+      <div className="error-state">
+        <h3>Access Denied</h3>
+        <p>You don't have permission to view meetings.</p>
+      </div>
+    );
+  }
+  
+  return <MeetingList />;
+}
+```
+
+### API Error Handling
+
+```typescript
+async function createMeeting(meetingData: any) {
+  try {
+    const response = await fetch('/api/meetings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(meetingData)
+    });
+    
+    if (response.status === 403) {
+      throw new Error('You do not have permission to create meetings');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to create meeting:', error);
+    // Show user-friendly error message
+  }
+}
+```
+
+## Performance Considerations
+
+### Permission Caching
+
+```typescript
+// Cache permissions to avoid repeated API calls
+const permissionCache = new Map();
+
+export function useCachedPermissions() {
+  const [permissions, setPermissions] = useState(null);
+  
+  useEffect(() => {
+    const cacheKey = 'user-permissions';
+    
+    if (permissionCache.has(cacheKey)) {
+      setPermissions(permissionCache.get(cacheKey));
+      return;
+    }
+    
+    fetchCapabilities().then(data => {
+      permissionCache.set(cacheKey, data);
+      setPermissions(data);
+    });
+  }, []);
+  
+  return permissions;
+}
+```
+
+### Lazy Loading
+
+```typescript
+// Only load permissions when needed
+const LazyAdminPanel = lazy(() => 
+  hasAny('read', 'role') ? import('./AdminPanel') : Promise.resolve({ default: () => null })
+);
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+<Card title="API Integration" icon="code" href="/rbac-api">
+  How to fetch permissions from the API
+</Card>
+
+<Card title="Permission Matrix" icon="key" href="/rbac-permissions">
+  Understanding available permissions
+</Card>
+
+<Card title="Best Practices" icon="check-circle" href="/rbac-best-practices">
+  Guidelines for frontend RBAC implementation
+</Card>
+</CardGroup>

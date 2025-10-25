@@ -1,0 +1,449 @@
+---
+title: "Get Meeting Details"
+api: "GET /api/v1/meetings/[id]"
+description: "Get comprehensive meeting details including participants, transcript, and recording"
+icon: "calendar-days"
+---
+
+## Overview
+
+Retrieve detailed information about a specific meeting including basic meeting data, participant analysis with talk times, transcript segments, and recording information.
+
+## Authentication
+
+<Note>
+Authentication is optional for this endpoint. If provided, it will be validated and used for permission checks. If not provided, the endpoint will return public meeting data.
+</Note>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Meeting ID (must be a valid UUID)
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"`
+</ParamField>
+
+## Response
+
+### Success Response
+
+<ResponseField name="success" type="boolean">
+  Success indicator: `true`
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Complete meeting data
+
+  <Expandable title="Meeting Object">
+    <ResponseField name="id" type="string">
+      Meeting ID
+    </ResponseField>
+    
+    <ResponseField name="title" type="string">
+      Meeting title
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Meeting status (`scheduled`, `in_progress`, `completed`, `cancelled`, `skip`, `error`)
+    </ResponseField>
+    
+    <ResponseField name="scheduledStartAt" type="string">
+      Scheduled start time (ISO 8601)
+    </ResponseField>
+    
+    <ResponseField name="scheduledEndAt" type="string">
+      Scheduled end time (ISO 8601)
+    </ResponseField>
+    
+    <ResponseField name="scheduledDurationMs" type="number">
+      Scheduled duration in milliseconds
+    </ResponseField>
+    
+    <ResponseField name="scheduledDurationMinutes" type="number">
+      Scheduled duration in minutes
+    </ResponseField>
+    
+    <ResponseField name="channel" type="string">
+      Meeting channel (`gmeet`, `zoom`, `teams`, `offline`)
+    </ResponseField>
+    
+    <ResponseField name="host" type="object">
+      Meeting host information
+
+      <Expandable title="Host Object">
+        <ResponseField name="id" type="string">
+          Host user ID
+        </ResponseField>
+        
+        <ResponseField name="name" type="string">
+          Host name
+        </ResponseField>
+        
+        <ResponseField name="email" type="string">
+          Host email
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      Meeting creation timestamp (ISO 8601)
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      Meeting last update timestamp (ISO 8601)
+    </ResponseField>
+  </Expandable>
+
+  <Expandable title="Participants Object">
+    <ResponseField name="count" type="number">
+      Number of participants
+    </ResponseField>
+    
+    <ResponseField name="totalTalkTimeMs" type="number">
+      Total talk time across all participants in milliseconds
+    </ResponseField>
+    
+    <ResponseField name="list" type="array">
+      List of participants with talk time analysis
+
+      <Expandable title="Participant Object">
+        <ResponseField name="id" type="string">
+          Participant ID
+        </ResponseField>
+        
+        <ResponseField name="name" type="string">
+          Participant name
+        </ResponseField>
+        
+        <ResponseField name="talkTimeMs" type="number">
+          Talk time in milliseconds
+        </ResponseField>
+        
+        <ResponseField name="talkTimeMinutes" type="number">
+          Talk time in minutes
+        </ResponseField>
+        
+        <ResponseField name="talkTimeSeconds" type="number">
+          Talk time in seconds
+        </ResponseField>
+        
+        <ResponseField name="talkTimeFormatted" type="string">
+          Formatted talk time (e.g., "5 Min 30 Sec")
+        </ResponseField>
+        
+        <ResponseField name="percentage" type="number">
+          Percentage of total talk time
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+
+  <Expandable title="Transcript Object">
+    <ResponseField name="segmentCount" type="number">
+      Number of transcript segments
+    </ResponseField>
+    
+    <ResponseField name="segments" type="array">
+      List of transcript segments
+
+      <Expandable title="Transcript Segment Object">
+        <ResponseField name="id" type="string">
+          Segment ID
+        </ResponseField>
+        
+        <ResponseField name="startMs" type="number">
+          Start time in milliseconds
+        </ResponseField>
+        
+        <ResponseField name="endMs" type="number">
+          End time in milliseconds
+        </ResponseField>
+        
+        <ResponseField name="timestamp" type="string">
+          Formatted timestamp (HH:MM:SS)
+        </ResponseField>
+        
+        <ResponseField name="speakerName" type="string">
+          Speaker name
+        </ResponseField>
+        
+        <ResponseField name="text" type="string">
+          Transcript text
+        </ResponseField>
+        
+        <ResponseField name="participantId" type="string">
+          Participant ID (optional)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+
+  <Expandable title="Recording Object">
+    <ResponseField name="id" type="string">
+      Recording ID
+    </ResponseField>
+    
+    <ResponseField name="url" type="string">
+      Recording storage URL
+    </ResponseField>
+    
+    <ResponseField name="durationMs" type="number">
+      Recording duration in milliseconds
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Recording status
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Get Meeting Details
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000' \
+  -H 'Authorization: Bearer your_jwt_token_here'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer your_jwt_token_here'
+  }
+});
+
+const data = await response.json();
+
+if (data.success) {
+  console.log('Meeting:', data.data.meeting.title);
+  console.log('Participants:', data.data.participants.count);
+  console.log('Transcript segments:', data.data.transcript.segmentCount);
+  
+  if (data.data.recording) {
+    console.log('Recording available:', data.data.recording.url);
+  }
+}
+```
+
+```python Python
+import requests
+
+response = requests.get(
+  'http://localhost:3001/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000',
+  headers={'Authorization': 'Bearer your_jwt_token_here'}
+)
+
+data = response.json()
+
+if data.get('success'):
+  meeting = data['data']['meeting']
+  participants = data['data']['participants']
+  transcript = data['data']['transcript']
+  
+  print(f"Meeting: {meeting['title']}")
+  print(f"Status: {meeting['status']}")
+  print(f"Participants: {participants['count']}")
+  print(f"Transcript segments: {transcript['segmentCount']}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "success": true,
+  "data": {
+    "meeting": {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "title": "Weekly Team Standup",
+      "status": "completed",
+      "scheduledStartAt": "2024-01-15T10:00:00.000Z",
+      "scheduledEndAt": "2024-01-15T10:30:00.000Z",
+      "scheduledDurationMs": 1800000,
+      "scheduledDurationMinutes": 30,
+      "channel": "gmeet",
+      "host": {
+        "id": "660e8400-e29b-41d4-a716-446655440001",
+        "name": "John Doe",
+        "email": "john@example.com"
+      },
+      "createdAt": "2024-01-15T09:30:00.000Z",
+      "updatedAt": "2024-01-15T10:35:00.000Z"
+    },
+    "participants": {
+      "count": 3,
+      "totalTalkTimeMs": 1650000,
+      "list": [
+        {
+          "id": "speaker-0",
+          "name": "John Doe",
+          "talkTimeMs": 900000,
+          "talkTimeMinutes": 15,
+          "talkTimeSeconds": 0,
+          "talkTimeFormatted": "15 Min 0 Sec",
+          "percentage": 55
+        },
+        {
+          "id": "speaker-1",
+          "name": "Jane Smith",
+          "talkTimeMs": 600000,
+          "talkTimeMinutes": 10,
+          "talkTimeSeconds": 0,
+          "talkTimeFormatted": "10 Min 0 Sec",
+          "percentage": 36
+        },
+        {
+          "id": "speaker-2",
+          "name": "Bob Wilson",
+          "talkTimeMs": 150000,
+          "talkTimeMinutes": 2,
+          "talkTimeSeconds": 30,
+          "talkTimeFormatted": "2 Min 30 Sec",
+          "percentage": 9
+        }
+      ]
+    },
+    "transcript": {
+      "segmentCount": 45,
+      "segments": [
+        {
+          "id": "seg-1",
+          "startMs": 0,
+          "endMs": 2500,
+          "timestamp": "00:00:00",
+          "speakerName": "John Doe",
+          "text": "Good morning everyone, let's start with our weekly standup.",
+          "participantId": "part-1"
+        },
+        {
+          "id": "seg-2",
+          "startMs": 2500,
+          "endMs": 4000,
+          "timestamp": "00:00:02",
+          "speakerName": "Jane Smith",
+          "text": "Morning John, I'm ready to go.",
+          "participantId": "part-2"
+        }
+      ]
+    },
+    "recording": {
+      "id": "rec-1",
+      "url": "https://storage.example.com/recordings/meeting-123.mp4",
+      "durationMs": 1800000,
+      "status": "completed"
+    }
+  }
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="400 - Invalid Meeting ID Format">
+```json
+{
+  "error": "Invalid meeting ID format",
+  "message": "Meeting ID must be a valid UUID"
+}
+```
+
+The meeting ID is not a valid UUID format.
+</Accordion>
+
+<Accordion title="404 - Meeting Not Found">
+```json
+{
+  "error": "Meeting not found",
+  "message": "This meeting does not exist or you don't have access to it"
+}
+```
+
+The meeting doesn't exist or the user doesn't have access to it.
+</Accordion>
+
+<Accordion title="401 - Invalid Token">
+```json
+{
+  "error": "Invalid token"
+}
+```
+
+The provided authentication token is invalid.
+</Accordion>
+
+<Accordion title="403 - Forbidden">
+```json
+{
+  "error": "Forbidden"
+}
+```
+
+The user doesn't have permission to access this meeting.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "error": "Internal server error",
+  "message": "Failed to fetch meeting details"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## Permission Requirements
+
+If authentication is provided, the user must have:
+- **meeting.read** permission for the specific meeting
+- Access to the meeting's organizational unit (if applicable)
+
+## Data Sources
+
+The endpoint aggregates data from multiple sources:
+- **Meeting details**: From the `meetings` table
+- **Participant analysis**: Calculated from transcript segments
+- **Transcript**: From `transcript` and `transcript_segments` tables
+- **Recording**: From the `recording` table
+
+## Performance Considerations
+
+- Large meetings with many transcript segments may take longer to process
+- Consider pagination for transcript segments in very long meetings
+- Recording data is optional and may not be available for all meetings
+
+## Use Cases
+
+- **Meeting Dashboard**: Display comprehensive meeting information
+- **Participant Analysis**: Show who spoke most and for how long
+- **Transcript Review**: Allow users to read through meeting transcripts
+- **Recording Access**: Provide links to meeting recordings
+- **Meeting History**: Archive and review past meetings
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="List Meetings" icon="list" href="/api-reference/meetings/list">
+  Get a list of meetings with basic information
+</Card>
+
+<Card title="Meeting Participants" icon="users" href="/api-reference/meetings/participants">
+  Get detailed participant information
+</Card>
+
+<Card title="Meeting Transcript" icon="file-text" href="/api-reference/meetings/transcript">
+  Get meeting transcript with pagination
+</Card>
+
+<Card title="Meeting Recording" icon="video" href="/api-reference/meetings/recording">
+  Get meeting recording information
+</Card>
+</CardGroup>

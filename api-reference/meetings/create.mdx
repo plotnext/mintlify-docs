@@ -1,0 +1,657 @@
+---
+title: "Create Meeting"
+api: "POST /api/v1/meetings"
+description: "Create or update a meeting with automated bot integration"
+icon: "calendar-plus"
+---
+
+## Overview
+
+Create or update a meeting in the system. This endpoint automatically creates a bot session for the meeting and schedules it to start 5 minutes before the scheduled time. Supports upsert behavior based on `external_meeting_id`.
+
+## Authentication
+
+<Warning>
+This endpoint requires authentication via JWT token with `enterpriseId` and `defaultOrgUnitId` claims.
+</Warning>
+
+Provide authentication via:
+- **Authorization header**: `Authorization: Bearer YOUR_TOKEN` (required)
+
+## Request Body
+
+<ParamField body="scheduled_start_at" type="string" required>
+  ISO 8601 timestamp for when the meeting is scheduled to start
+  
+  **Example**: `"2024-03-20T14:00:00Z"`
+</ParamField>
+
+<ParamField body="scheduled_end_at" type="string" required>
+  ISO 8601 timestamp for when the meeting is scheduled to end
+  
+  **Example**: `"2024-03-20T15:00:00Z"`
+</ParamField>
+
+<ParamField body="title" type="string">
+  Meeting title/subject
+  
+  **Default**: `"empty title"`
+  
+  **Example**: `"Q1 Planning Review"`
+</ParamField>
+
+<ParamField body="channel" type="string">
+  Meeting platform/channel
+  
+  **Options**: `"gmeet"`, `"zoom"`, `"teams"`, `"offline"`
+  
+  **Example**: `"gmeet"`
+</ParamField>
+
+<ParamField body="join_url" type="string">
+  URL to join the meeting
+  
+  **Example**: `"https://meet.google.com/abc-defg-hij"`
+</ParamField>
+
+<ParamField body="status" type="string">
+  Meeting status
+  
+  **Options**: `"scheduled"`, `"skip"`, `"in_progress"`, `"cancelled"`, `"completed"`, `"deleted"`, `"error"`
+  
+  **Default**: `"scheduled"`
+</ParamField>
+
+<ParamField body="host_user_id" type="string">
+  ID of the user hosting the meeting (nullable)
+  
+  **Example**: `"user-123"`
+</ParamField>
+
+<ParamField body="external_meeting_id" type="string">
+  External meeting identifier (e.g., from Google Calendar, Zoom). Used for upsert behavior.
+  
+  **Example**: `"google-cal-event-abc123"`
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Additional metadata as a JSON object
+  
+  **Example**: `{ "calendarId": "primary", "recurringEventId": "abc" }`
+</ParamField>
+
+<ParamField body="participant_emails" type="array">
+  Array of participant email addresses
+  
+  **Example**: `["alice@example.com", "bob@example.com"]`
+</ParamField>
+
+<ParamField body="recurring_meeting_id" type="string">
+  ID linking this meeting to a recurring meeting series
+  
+  **Example**: `"recurring-series-123"`
+</ParamField>
+
+<ParamField body="type" type="string">
+  Meeting type
+  
+  **Options**: `"internal"`, `"external"`
+  
+  **Default**: `"internal"`
+</ParamField>
+
+## Response
+
+<ResponseField name="meeting" type="object">
+  Created or updated meeting object
+  
+  <Expandable title="Meeting Object">
+    <ResponseField name="id" type="string">
+      Meeting unique identifier (UUID)
+    </ResponseField>
+    
+    <ResponseField name="enterprise_id" type="string">
+      Enterprise ID from JWT token
+    </ResponseField>
+    
+    <ResponseField name="org_unit_id" type="string">
+      Org unit ID from JWT token
+    </ResponseField>
+    
+    <ResponseField name="title" type="string">
+      Meeting title
+    </ResponseField>
+    
+    <ResponseField name="channel" type="string | null">
+      Meeting channel/platform
+    </ResponseField>
+    
+    <ResponseField name="join_url" type="string | null">
+      Meeting join URL
+    </ResponseField>
+    
+    <ResponseField name="scheduled_start_at" type="string">
+      Scheduled start timestamp
+    </ResponseField>
+    
+    <ResponseField name="scheduled_end_at" type="string">
+      Scheduled end timestamp
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Meeting status
+    </ResponseField>
+    
+    <ResponseField name="host_user_id" type="string | null">
+      Host user ID
+    </ResponseField>
+    
+    <ResponseField name="external_meeting_id" type="string | null">
+      External meeting identifier
+    </ResponseField>
+    
+    <ResponseField name="metadata" type="object | null">
+      Additional metadata
+    </ResponseField>
+    
+    <ResponseField name="recurring_meeting_id" type="string | null">
+      Recurring meeting series ID
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Meeting type
+    </ResponseField>
+    
+    <ResponseField name="created_at" type="string">
+      Creation timestamp
+    </ResponseField>
+    
+    <ResponseField name="updated_at" type="string">
+      Last update timestamp
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="botSession" type="object">
+  Bot session information for automated meeting recording
+  
+  <Expandable title="Bot Session Object">
+    <ResponseField name="id" type="string">
+      Bot session unique identifier
+    </ResponseField>
+    
+    <ResponseField name="meeting_id" type="string">
+      Associated meeting ID
+    </ResponseField>
+    
+    <ResponseField name="state" type="string">
+      Bot state: `"pending"`, `"active"`, `"completed"`, `"cancelled"`, `"error"`
+    </ResponseField>
+    
+    <ResponseField name="created_at" type="string">
+      Creation timestamp
+    </ResponseField>
+    
+    <ResponseField name="updated_at" type="string">
+      Last update timestamp
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="participants" type="array">
+  Array of created participant records
+  
+  <Expandable title="Participant Object">
+    <ResponseField name="id" type="string">
+      Participant unique identifier
+    </ResponseField>
+    
+    <ResponseField name="meeting_id" type="string">
+      Associated meeting ID
+    </ResponseField>
+    
+    <ResponseField name="user_id" type="string | null">
+      User ID if participant is a registered user
+    </ResponseField>
+    
+    <ResponseField name="email_id" type="string">
+      Participant email address
+    </ResponseField>
+    
+    <ResponseField name="display_name" type="string | null">
+      Participant display name
+    </ResponseField>
+    
+    <ResponseField name="contact_number" type="string | null">
+      Participant phone number
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Create Basic Meeting
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/meetings' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -d '{
+    "title": "Q1 Planning Review",
+    "channel": "gmeet",
+    "join_url": "https://meet.google.com/abc-defg-hij",
+    "scheduled_start_at": "2024-03-20T14:00:00Z",
+    "scheduled_end_at": "2024-03-20T15:00:00Z",
+    "status": "scheduled"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/meetings', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    title: 'Q1 Planning Review',
+    channel: 'gmeet',
+    join_url: 'https://meet.google.com/abc-defg-hij',
+    scheduled_start_at: '2024-03-20T14:00:00Z',
+    scheduled_end_at: '2024-03-20T15:00:00Z',
+    status: 'scheduled'
+  })
+});
+
+const data = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.post(
+  'http://localhost:3001/api/v1/meetings',
+  headers={
+    'Authorization': f'Bearer {token}',
+    'Content-Type': 'application/json'
+  },
+  json={
+    'title': 'Q1 Planning Review',
+    'channel': 'gmeet',
+    'join_url': 'https://meet.google.com/abc-defg-hij',
+    'scheduled_start_at': '2024-03-20T14:00:00Z',
+    'scheduled_end_at': '2024-03-20T15:00:00Z',
+    'status': 'scheduled'
+  }
+)
+
+data = response.json()
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success (201 Created)
+{
+  "meeting": {
+    "id": "meeting-abc123",
+    "enterprise_id": "550e8400-e29b-41d4-a716-446655440000",
+    "org_unit_id": "org-unit-123",
+    "title": "Q1 Planning Review",
+    "channel": "gmeet",
+    "join_url": "https://meet.google.com/abc-defg-hij",
+    "scheduled_start_at": "2024-03-20T14:00:00Z",
+    "scheduled_end_at": "2024-03-20T15:00:00Z",
+    "status": "scheduled",
+    "host_user_id": null,
+    "external_meeting_id": null,
+    "metadata": null,
+    "recurring_meeting_id": null,
+    "type": "internal",
+    "created_at": "2024-03-15T10:30:00Z",
+    "updated_at": "2024-03-15T10:30:00Z"
+  },
+  "botSession": {
+    "id": "bot-session-xyz",
+    "meeting_id": "meeting-abc123",
+    "state": "pending",
+    "created_at": "2024-03-15T10:30:00Z",
+    "updated_at": "2024-03-15T10:30:00Z"
+  },
+  "participants": []
+}
+```
+</ResponseExample>
+
+### Create Meeting with Participants
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/meetings' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -d '{
+    "title": "Team Standup",
+    "channel": "zoom",
+    "join_url": "https://zoom.us/j/123456789",
+    "scheduled_start_at": "2024-03-20T09:00:00Z",
+    "scheduled_end_at": "2024-03-20T09:30:00Z",
+    "participant_emails": [
+      "alice@example.com",
+      "bob@example.com",
+      "charlie@example.com"
+    ],
+    "type": "internal"
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success with Participants
+{
+  "meeting": {
+    "id": "meeting-def456",
+    "enterprise_id": "550e8400-e29b-41d4-a716-446655440000",
+    "org_unit_id": "org-unit-123",
+    "title": "Team Standup",
+    "channel": "zoom",
+    "join_url": "https://zoom.us/j/123456789",
+    "scheduled_start_at": "2024-03-20T09:00:00Z",
+    "scheduled_end_at": "2024-03-20T09:30:00Z",
+    "status": "scheduled",
+    "host_user_id": null,
+    "external_meeting_id": null,
+    "metadata": null,
+    "recurring_meeting_id": null,
+    "type": "internal",
+    "created_at": "2024-03-15T10:35:00Z",
+    "updated_at": "2024-03-15T10:35:00Z"
+  },
+  "botSession": {
+    "id": "bot-session-abc",
+    "meeting_id": "meeting-def456",
+    "state": "pending",
+    "created_at": "2024-03-15T10:35:00Z",
+    "updated_at": "2024-03-15T10:35:00Z"
+  },
+  "participants": [
+    {
+      "id": "participant-1",
+      "meeting_id": "meeting-def456",
+      "user_id": "user-123",
+      "email_id": "alice@example.com",
+      "display_name": null,
+      "contact_number": null
+    },
+    {
+      "id": "participant-2",
+      "meeting_id": "meeting-def456",
+      "user_id": "user-456",
+      "email_id": "bob@example.com",
+      "display_name": null,
+      "contact_number": null
+    },
+    {
+      "id": "participant-3",
+      "meeting_id": "meeting-def456",
+      "user_id": null,
+      "email_id": "charlie@example.com",
+      "display_name": null,
+      "contact_number": null
+    }
+  ]
+}
+```
+</ResponseExample>
+
+### Update Existing Meeting (Upsert)
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/meetings' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -d '{
+    "external_meeting_id": "google-cal-event-abc123",
+    "title": "Q1 Planning Review - UPDATED",
+    "scheduled_start_at": "2024-03-20T15:00:00Z",
+    "scheduled_end_at": "2024-03-20T16:00:00Z",
+    "status": "scheduled"
+  }'
+```
+</RequestExample>
+
+### Cancel Meeting
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/meetings' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -d '{
+    "external_meeting_id": "google-cal-event-abc123",
+    "scheduled_start_at": "2024-03-20T14:00:00Z",
+    "scheduled_end_at": "2024-03-20T15:00:00Z",
+    "status": "cancelled"
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json Cancelled Meeting
+{
+  "meeting": {
+    "id": "meeting-abc123",
+    "status": "cancelled",
+    ...
+  },
+  "botSession": {
+    "id": "bot-session-xyz",
+    "meeting_id": "meeting-abc123",
+    "state": "cancelled",
+    ...
+  },
+  "participants": []
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Unauthorized">
+```json
+{
+  "error": "Invalid or missing token"
+}
+```
+
+Missing or invalid JWT token.
+</Accordion>
+
+<Accordion title="400 - Missing Enterprise or Org Unit">
+```json
+{
+  "error": "Token missing enterprise_id or org_unit_id"
+}
+```
+
+JWT token doesn't contain required `enterpriseId` or `defaultOrgUnitId` claims.
+</Accordion>
+
+<Accordion title="400 - Missing Required Fields">
+```json
+{
+  "error": "scheduled_start_at is required"
+}
+```
+
+Missing `scheduled_start_at` or `scheduled_end_at`.
+</Accordion>
+
+<Accordion title="400 - Invalid Status">
+```json
+{
+  "error": "invalid status. allowed: scheduled,skip,in_progress,cancelled,completed,deleted,error"
+}
+```
+
+Invalid status value provided.
+</Accordion>
+
+<Accordion title="400 - Invalid Channel">
+```json
+{
+  "error": "invalid channel. allowed: gmeet,zoom,teams,offline"
+}
+```
+
+Invalid channel value provided.
+</Accordion>
+
+<Accordion title="500 - Internal Server Error">
+```json
+{
+  "error": "internal_server_error"
+}
+```
+
+Database or server error occurred.
+</Accordion>
+</AccordionGroup>
+
+## Upsert Behavior
+
+The endpoint supports upsert (update or insert) based on `external_meeting_id`:
+
+### If `external_meeting_id` is provided and exists:
+- **Updates** the existing meeting
+- Preserves `host_user_id` if not provided in request
+- Updates `updated_at` timestamp
+
+### If `external_meeting_id` is new or not provided:
+- **Creates** a new meeting
+- Generates a new meeting ID
+
+<Note>
+Use `external_meeting_id` when syncing with external calendar systems (Google Calendar, Outlook, etc.) to prevent duplicate meetings.
+</Note>
+
+## Automated Bot Integration
+
+When a meeting is created with status `"scheduled"`:
+
+<Steps>
+<Step title="Bot Session Created">
+  A bot session record is automatically created with state `"pending"`
+</Step>
+
+<Step title="Job Scheduled">
+  A background job is scheduled to start **5 minutes before** the meeting's `scheduled_start_at` time
+</Step>
+
+<Step title="Bot Joins Meeting">
+  At the scheduled time, the bot automatically joins the meeting to record it
+</Step>
+
+<Step title="Recording & Transcription">
+  Bot records the meeting and generates transcripts
+</Step>
+</Steps>
+
+### Bot Session States
+
+- `pending`: Bot scheduled, waiting for meeting start
+- `active`: Bot has joined and is recording
+- `completed`: Recording finished successfully
+- `cancelled`: Meeting cancelled, bot won't join
+- `error`: Bot encountered an error
+
+## Meeting Cancellation
+
+When creating a meeting with status `"cancelled"` or `"deleted"`:
+
+1. **Existing bot session** is updated to `"cancelled"` state
+2. **Scheduled job** is deleted from the job queue
+3. **No participants** are created
+4. **Bot will not join** the meeting
+
+## Participant Management
+
+### Participant Creation
+
+When `participant_emails` array is provided:
+
+<Check>
+**Automatic user lookup**: System checks if email belongs to a registered user
+</Check>
+
+<Check>
+**Duplicate prevention**: `ON CONFLICT DO NOTHING` prevents duplicate participants
+</Check>
+
+<Check>
+**Partial failure handling**: If one participant fails, others still process
+</Check>
+
+### Participant Fields
+
+- `user_id`: Set if email matches a registered user, otherwise `null`
+- `email_id`: Normalized email (lowercased, trimmed)
+- `display_name`: Currently `null`, reserved for future use
+- `contact_number`: Currently `null`, reserved for future use
+
+## Job Scheduling
+
+Meetings are automatically scheduled in the jobs system:
+
+```json
+{
+  "name": "meeting.start",
+  "options": {
+    "singletonKey": "meeting-{MEETING_ID}",
+    "startAfter": "{SCHEDULED_START_AT - 5 minutes}",
+    "expireInSeconds": 3600,
+    "retryLimit": 3,
+    "retryBackoff": true,
+    "priority": 10
+  }
+}
+```
+
+<Tip>
+The `singletonKey` ensures only one job exists per meeting, automatically handling updates to rescheduled meetings.
+</Tip>
+
+## Environment Variables
+
+Required environment variables for full functionality:
+
+- `DATABASE_URL`: PostgreSQL connection string
+- `JWT_SECRET`: Secret for JWT token verification
+- `JOBS_URL`: URL for background jobs API
+- `JOBS_AUTH_TOKEN`: Authentication token for jobs API
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="List Meetings" icon="list" href="/api-reference/meetings/list">
+  Retrieve meetings with filters
+</Card>
+
+<Card title="Get Meeting Details" icon="calendar" href="/api-reference/meetings/get">
+  Get detailed information about a specific meeting
+</Card>
+</CardGroup>
+
+
+
+
+
+

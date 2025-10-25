@@ -1,0 +1,362 @@
+---
+title: "Register User"
+api: "POST /api/v1/auth/register"
+description: "Create a new user account with enterprise setup"
+icon: "user-plus"
+---
+
+## Overview
+
+Create a new user account with automatic enterprise creation. This endpoint supports both traditional email/password registration and Google OAuth registration. Email verification is required for email/password signups before the user can log in.
+
+## Authentication
+
+<Info>
+This endpoint does not require authentication - it's used to create new accounts.
+</Info>
+
+## Request Body
+
+<ParamField body="name" type="string" required>
+  User's full name. Must be at least 2 characters long.
+  
+  **Example**: `"John Doe"`
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Valid email address. Must be unique across all users.
+  
+  **Example**: `"john@example.com"`
+</ParamField>
+
+<ParamField body="phone" type="string" required>
+  Phone number with 10-15 digits. Must be unique across all users.
+  
+  **Example**: `"+1234567890"` or `"(123) 456-7890"`
+</ParamField>
+
+<ParamField body="companyName" type="string" required>
+  Name of the company/enterprise. Must be at least 2 characters long. This will be used as the root organizational unit name.
+  
+  **Example**: `"Acme Corporation"`
+</ParamField>
+
+<ParamField body="subdomain" type="string" required>
+  Unique subdomain identifier for the enterprise. Must be unique across all enterprises.
+  
+  **Example**: `"acme"`
+</ParamField>
+
+<ParamField body="password" type="string">
+  Password for email/password signup. Required if not using Google OAuth.
+  
+  **Requirements:**
+  - Minimum 8 characters
+  - At least one uppercase letter
+  - At least one lowercase letter
+  - At least one number
+  
+  **Example**: `"SecurePass123"`
+</ParamField>
+
+<ParamField body="googleToken" type="string">
+  JWT token from Google OAuth signup. Required for Google authentication.
+  
+  **Purpose**: `google_signup`
+</ParamField>
+
+<ParamField body="provider" type="string">
+  Authentication provider. Use `"google"` for Google OAuth signup.
+  
+  **Default**: `"local"`
+  
+  **Options**: `"local"`, `"google"`
+</ParamField>
+
+## Response
+
+### Email/Password Registration
+
+<ResponseField name="status" type="string">
+  Registration status: `"pending_verification"`
+</ResponseField>
+
+<ResponseField name="delivery" type="string">
+  Email delivery status: `"sent"`, `"failed"`
+</ResponseField>
+
+<ResponseField name="id" type="string">
+  Email message ID (when delivery is successful)
+</ResponseField>
+
+<ResponseField name="reason" type="string">
+  Error reason (when delivery fails)
+</ResponseField>
+
+### Google OAuth Registration
+
+<ResponseField name="ok" type="boolean">
+  Success indicator: `true`
+</ResponseField>
+
+<ResponseField name="googleSignup" type="boolean">
+  Indicates Google OAuth signup: `true`
+</ResponseField>
+
+<Note>
+Google OAuth signups automatically log the user in and set an `auth_token` cookie.
+</Note>
+
+## Examples
+
+### Email/Password Signup
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/auth/register' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "+1234567890",
+    "password": "SecurePass123",
+    "companyName": "Acme Corporation",
+    "subdomain": "acme"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/auth/register', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    name: 'John Doe',
+    email: 'john@example.com',
+    phone: '+1234567890',
+    password: 'SecurePass123',
+    companyName: 'Acme Corporation',
+    subdomain: 'acme'
+  })
+});
+
+const data = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.post(
+  'http://localhost:3001/api/v1/auth/register',
+  json={
+    'name': 'John Doe',
+    'email': 'john@example.com',
+    'phone': '+1234567890',
+    'password': 'SecurePass123',
+    'companyName': 'Acme Corporation',
+    'subdomain': 'acme'
+  }
+)
+
+data = response.json()
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "status": "pending_verification",
+  "delivery": "sent",
+  "id": "email_abc123"
+}
+```
+
+```json Email Delivery Failed
+{
+  "status": "pending_verification",
+  "delivery": "failed",
+  "reason": "Invalid recipient email address"
+}
+```
+</ResponseExample>
+
+### Google OAuth Signup
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/auth/register' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Jane Smith",
+    "email": "jane@example.com",
+    "phone": "+1987654321",
+    "companyName": "TechCo Inc",
+    "subdomain": "techco",
+    "googleToken": "eyJhbGc...",
+    "provider": "google"
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "ok": true,
+  "googleSignup": true
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+<ResponseField name="field" type="string">
+  The specific field that caused the error (when applicable)
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="400 - Missing Required Field">
+```json
+{
+  "error": "Email is required",
+  "field": "email"
+}
+```
+</Accordion>
+
+<Accordion title="400 - Invalid Email Format">
+```json
+{
+  "error": "Please enter a valid email address",
+  "field": "email"
+}
+```
+</Accordion>
+
+<Accordion title="400 - Invalid Phone Format">
+```json
+{
+  "error": "Please enter a valid phone number (10-15 digits)",
+  "field": "phone"
+}
+```
+</Accordion>
+
+<Accordion title="400 - Weak Password">
+```json
+{
+  "error": "Password must contain at least one uppercase letter",
+  "field": "password"
+}
+```
+</Accordion>
+
+<Accordion title="409 - Email Already Exists">
+```json
+{
+  "error": "This email is already registered. Please sign in instead.",
+  "field": "email"
+}
+```
+</Accordion>
+
+<Accordion title="409 - Phone Already Exists">
+```json
+{
+  "error": "This phone number is already registered. Please use a different number.",
+  "field": "phone"
+}
+```
+</Accordion>
+
+<Accordion title="409 - Subdomain Conflict">
+```json
+{
+  "error": "Company subdomain conflict. Please try again.",
+  "field": "companyName"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## What Happens After Registration
+
+<Steps>
+<Step title="User Created">
+  A new user account is created in the system with the provided information.
+</Step>
+
+<Step title="Enterprise Setup">
+  A new enterprise is created with the specified company name and subdomain. The user is automatically assigned the **Owner** role.
+</Step>
+
+<Step title="Root Org Unit">
+  A root organizational unit is created with the company name and the user is assigned to it.
+</Step>
+
+<Step title="Email Verification (Email/Password only)">
+  For email/password signups, a verification email is sent with a link valid for 15 minutes. The user must verify their email before they can log in.
+</Step>
+
+<Step title="Auto-Login (Google only)">
+  For Google OAuth signups, the user is automatically logged in with a JWT token set as an HTTP-only cookie.
+</Step>
+</Steps>
+
+## Validation Rules
+
+### Name Validation
+- **Required**: Yes
+- **Minimum length**: 2 characters
+- **Format**: Any characters
+
+### Email Validation
+- **Required**: Yes
+- **Format**: Valid email address (`user@domain.com`)
+- **Unique**: Must not already exist in the system
+
+### Phone Validation
+- **Required**: Yes
+- **Format**: 10-15 digits (non-digit characters are allowed but stripped for validation)
+- **Unique**: Must not already exist in the system
+
+### Password Validation (Email/Password only)
+- **Required**: Yes (when not using Google OAuth)
+- **Minimum length**: 8 characters
+- **Must contain**: Uppercase letter, lowercase letter, and number
+
+### Company Name Validation
+- **Required**: Yes
+- **Minimum length**: 2 characters
+
+### Subdomain Validation
+- **Required**: Yes
+- **Unique**: Must not already exist
+
+<Tip>
+After successful registration with email/password, direct users to check their email for the verification link. Consider implementing a "resend verification email" feature for better UX.
+</Tip>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Verify Email" icon="envelope-circle-check" href="/api-reference/auth/verify">
+  Verify user email address after registration
+</Card>
+
+<Card title="Login" icon="right-to-bracket" href="/api-reference/auth/login">
+  Log in after email verification
+</Card>
+</CardGroup>
+
+
+
+
+
+

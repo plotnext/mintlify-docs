@@ -1,0 +1,401 @@
+---
+title: "Backend Integration"
+description: "Server-side RBAC implementation and permission validation"
+icon: "server"
+---
+
+## Backend Integration
+
+### Server-Side Permission Checking
+
+```typescript
+import { getUserCapabilities } from '@/lib/iam.server';
+
+export async function createMeeting(req: Request, userId: string) {
+  // Get user's capabilities
+  const capabilities = await getUserCapabilities(userId);
+  
+  // Check if user can create meetings
+  const canCreate = capabilities.meeting?.create;
+  if (!canCreate) {
+    throw new Error('Insufficient permissions to create meetings');
+  }
+  
+  // Check enterprise-wide vs org-unit scoped
+  if (canCreate.enterprise) {
+    // User can create meetings anywhere in enterprise
+    return await createMeetingAnywhere(req.body);
+  } else if (canCreate.orgUnits.length > 0) {
+    // User can only create in specific org units
+    const orgUnitId = req.body.orgUnitId;
+    if (!canCreate.orgUnits.includes(orgUnitId)) {
+      throw new Error('Cannot create meeting in this org unit');
+    }
+    return await createMeetingInOrgUnit(req.body, orgUnitId);
+  }
+  
+  throw new Error('No permission to create meetings');
+}
+```
+
+### Middleware Integration
+
+```typescript
+import { getUserCapabilities } from '@/lib/iam.server';
+
+export function requirePermission(resource: string, action: string) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const capabilities = await getUserCapabilities(userId);
+    const hasPermission = capabilities[resource]?.[action];
+    
+    if (!hasPermission) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    
+    // Add capabilities to request for use in route handlers
+    req.capabilities = capabilities;
+    next();
+  };
+}
+
+// Usage in routes
+app.post('/api/meetings', 
+  requirePermission('meeting', 'create'),
+  createMeetingHandler
+);
+```
+
+### Advanced Permission Middleware
+
+```typescript
+export function requireScopedPermission(resource: string, action: string) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const userId = req.user?.id;
+    const enterpriseId = req.user?.enterpriseId;
+    
+    if (!userId || !enterpriseId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const capabilities = await getUserCapabilities(userId, enterpriseId);
+    const permission = capabilities[resource]?.[action];
+    
+    if (!permission) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    
+    // Check if user has enterprise-wide permission
+    if (permission.enterprise) {
+      req.permissionScope = 'enterprise';
+      return next();
+    }
+    
+    // Check org-unit specific permission
+    const orgUnitId = req.body?.orgUnitId || req.params?.orgUnitId;
+    if (orgUnitId && permission.orgUnits?.includes(orgUnitId)) {
+      req.permissionScope = 'org_unit';
+      req.allowedOrgUnitId = orgUnitId;
+      return next();
+    }
+    
+    return res.status(403).json({ 
+      error: 'Insufficient permissions for this organizational unit' 
+    });
+  };
+}
+```
+
+## Database Integration
+
+### User Capabilities Query
+
+```typescript
+// lib/iam.server.ts
+export async function getUserCapabilities(userId: string, enterpriseId: string) {
+  const query = `
+    SELECT 
+      p.resource,
+      p.action,
+      ura.scope_type,
+      ura.org_unit_id
+    FROM user_role_assignment ura
+    JOIN role r ON ura.role_id = r.id
+    JOIN role_permission rp ON r.id = rp.role_id
+    JOIN permission p ON rp.permission_id = p.id
+    WHERE ura.user_id = $1 
+      AND ura.enterprise_id = $2
+      AND r.enterprise_id IS NULL OR r.enterprise_id = $2
+  `;
+  
+  const result = await db.query(query, [userId, enterpriseId]);
+  
+  // Group permissions by resource and action
+  const capabilities = {};
+  
+  for (const row of result.rows) {
+    const { resource, action, scope_type, org_unit_id } = row;
+    
+    if (!capabilities[resource]) {
+      capabilities[resource] = {};
+    }
+    
+    if (!capabilities[resource][action]) {
+      capabilities[resource][action] = {
+        enterprise: false,
+        orgUnits: []
+      };
+    }
+    
+    if (scope_type === 'enterprise') {
+      capabilities[resource][action].enterprise = true;
+    } else if (scope_type === 'org_unit' && org_unit_id) {
+      capabilities[resource][action].orgUnits.push(org_unit_id);
+    }
+  }
+  
+  return capabilities;
+}
+```
+
+### Permission Validation Helper
+
+```typescript
+export async function validatePermission(
+  userId: string,
+  enterpriseId: string,
+  resource: string,
+  action: string,
+  context?: { orgUnitId?: string }
+): Promise<boolean> {
+  const capabilities = await getUserCapabilities(userId, enterpriseId);
+  const permission = capabilities[resource]?.[action];
+  
+  if (!permission) return false;
+  
+  // Check enterprise-wide permission
+  if (permission.enterprise) return true;
+  
+  // Check org-unit specific permission
+  if (context?.orgUnitId && permission.orgUnits?.includes(context.orgUnitId)) {
+    return true;
+  }
+  
+  return false;
+}
+```
+
+## Route Protection Examples
+
+### Meeting Routes
+
+```typescript
+// GET /api/meetings - List meetings user can access
+export async function listMeetings(req: Request, res: Response) {
+  const userId = req.user.id;
+  const enterpriseId = req.user.enterpriseId;
+  
+  const capabilities = await getUserCapabilities(userId, enterpriseId);
+  const canRead = capabilities.meeting?.read;
+  
+  if (!canRead) {
+    return res.status(403).json({ error: 'Cannot read meetings' });
+  }
+  
+  let meetings;
+  if (canRead.enterprise) {
+    // User can read all meetings in enterprise
+    meetings = await getAllMeetingsInEnterprise(enterpriseId);
+  } else {
+    // User can only read meetings in specific org units
+    meetings = await getMeetingsInOrgUnits(canRead.orgUnits);
+  }
+  
+  res.json({ meetings });
+}
+
+// POST /api/meetings - Create meeting
+export async function createMeeting(req: Request, res: Response) {
+  const userId = req.user.id;
+  const enterpriseId = req.user.enterpriseId;
+  const { orgUnitId, ...meetingData } = req.body;
+  
+  const canCreate = await validatePermission(
+    userId, 
+    enterpriseId, 
+    'meeting', 
+    'create',
+    { orgUnitId }
+  );
+  
+  if (!canCreate) {
+    return res.status(403).json({ error: 'Cannot create meeting in this org unit' });
+  }
+  
+  const meeting = await createMeetingInOrgUnit(meetingData, orgUnitId);
+  res.json({ meeting });
+}
+```
+
+### User Management Routes
+
+```typescript
+// GET /api/users - List users user can manage
+export async function listUsers(req: Request, res: Response) {
+  const userId = req.user.id;
+  const enterpriseId = req.user.enterpriseId;
+  
+  const capabilities = await getUserCapabilities(userId, enterpriseId);
+  const canRead = capabilities.user?.read;
+  
+  if (!canRead) {
+    return res.status(403).json({ error: 'Cannot read users' });
+  }
+  
+  let users;
+  if (canRead.enterprise) {
+    users = await getAllUsersInEnterprise(enterpriseId);
+  } else {
+    users = await getUsersInOrgUnits(canRead.orgUnits);
+  }
+  
+  res.json({ users });
+}
+
+// POST /api/users - Create user
+export async function createUser(req: Request, res: Response) {
+  const userId = req.user.id;
+  const enterpriseId = req.user.enterpriseId;
+  const { orgUnitId, roleKeys, ...userData } = req.body;
+  
+  // Check if user can create users
+  const canCreate = await validatePermission(
+    userId, 
+    enterpriseId, 
+    'user', 
+    'create',
+    { orgUnitId }
+  );
+  
+  if (!canCreate) {
+    return res.status(403).json({ error: 'Cannot create users in this org unit' });
+  }
+  
+  // Validate role assignments
+  const userCapabilities = await getUserCapabilities(userId, enterpriseId);
+  const availableRoles = await getAvailableRoles(enterpriseId);
+  
+  for (const roleKey of roleKeys) {
+    const role = availableRoles.find(r => r.key === roleKey);
+    if (!role) {
+      return res.status(400).json({ error: `Invalid role: ${roleKey}` });
+    }
+    
+    // Check if user can assign this role (role hierarchy)
+    const userRole = await getUserHighestRole(userId, enterpriseId);
+    if (userRole.priority <= role.priority) {
+      return res.status(403).json({ 
+        error: `Cannot assign role ${roleKey} - insufficient priority` 
+      });
+    }
+  }
+  
+  const newUser = await createUserWithRoles(userData, roleKeys, orgUnitId);
+  res.json({ user: newUser });
+}
+```
+
+## Error Handling
+
+### Permission Error Responses
+
+```typescript
+export class PermissionError extends Error {
+  constructor(
+    message: string,
+    public resource: string,
+    public action: string,
+    public context?: any
+  ) {
+    super(message);
+    this.name = 'PermissionError';
+  }
+}
+
+export function handlePermissionError(error: PermissionError, res: Response) {
+  if (error instanceof PermissionError) {
+    return res.status(403).json({
+      error: 'Insufficient permissions',
+      message: error.message,
+      resource: error.resource,
+      action: error.action
+    });
+  }
+  
+  return res.status(500).json({ error: 'Internal server error' });
+}
+```
+
+### Global Error Handler
+
+```typescript
+export function errorHandler(error: Error, req: Request, res: Response, next: NextFunction) {
+  console.error('API Error:', error);
+  
+  if (error instanceof PermissionError) {
+    return handlePermissionError(error, res);
+  }
+  
+  if (error.name === 'ValidationError') {
+    return res.status(400).json({ error: error.message });
+  }
+  
+  res.status(500).json({ error: 'Internal server error' });
+}
+```
+
+## Performance Optimization
+
+### Permission Caching
+
+```typescript
+import { LRUCache } from 'lru-cache';
+
+const permissionCache = new LRUCache<string, any>({
+  max: 1000,
+  ttl: 5 * 60 * 1000, // 5 minutes
+});
+
+export async function getCachedUserCapabilities(userId: string, enterpriseId: string) {
+  const cacheKey = `${userId}:${enterpriseId}`;
+  
+  if (permissionCache.has(cacheKey)) {
+    return permissionCache.get(cacheKey);
+  }
+  
+  const capabilities = await getUserCapabilities(userId, enterpriseId);
+  permissionCache.set(cacheKey, capabilities);
+  
+  return capabilities;
+}
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+<Card title="API Integration" icon="code" href="/rbac-api">
+  Client-side API integration
+</Card>
+
+<Card title="Database Schema" icon="database" href="/rbac-database">
+  Database structure for RBAC
+</Card>
+
+<Card title="Best Practices" icon="check-circle" href="/rbac-best-practices">
+  Backend RBAC best practices
+</Card>
+</CardGroup>

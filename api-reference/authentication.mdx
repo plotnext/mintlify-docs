@@ -1,0 +1,226 @@
+---
+title: "Authentication"
+description: "Learn how to authenticate with the Arali API"
+icon: "shield-halved"
+---
+
+## Overview
+
+Arali uses **JWT (JSON Web Tokens)** for secure API authentication. After successful authentication, you'll receive a token that must be included in subsequent API requests.
+
+## Authentication Methods
+
+Arali supports multiple authentication methods:
+
+<AccordionGroup>
+<Accordion title="Email & Password">
+  Traditional authentication using email address and password. Requires email verification before access is granted.
+</Accordion>
+
+<Accordion title="Google OAuth">
+  Sign in using Google OAuth 2.0. Email is automatically verified for Google users.
+</Accordion>
+
+<Accordion title="Invitation">
+  Accept an invitation sent by an enterprise administrator. Includes auto-generated credentials.
+</Accordion>
+</AccordionGroup>
+
+## Providing Authentication
+
+Once you have a JWT token, include it in your API requests using one of these methods:
+
+### Authorization Header (Recommended)
+
+```bash
+curl -X GET 'http://localhost:3001/api/v1/users' \
+  -H 'Authorization: Bearer YOUR_JWT_TOKEN'
+```
+
+### HTTP-Only Cookie
+
+For browser-based applications, the API automatically sets an `auth_token` cookie after successful login:
+
+```javascript
+// Cookie is automatically included in requests
+fetch('http://localhost:3001/api/v1/users', {
+  credentials: 'include'
+});
+```
+
+<Warning>
+Never expose JWT tokens in client-side code or public repositories. Always store tokens securely.
+</Warning>
+
+## JWT Token Structure
+
+Arali JWT tokens contain the following claims:
+
+<ParamField body="sub" type="string" required>
+  User ID (subject) - unique identifier for the authenticated user
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  User's email address
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  User's full name
+</ParamField>
+
+<ParamField body="enterpriseId" type="string" required>
+  ID of the user's current enterprise context
+</ParamField>
+
+<ParamField body="defaultOrgUnitId" type="string">
+  ID of the user's default organizational unit
+</ParamField>
+
+<ParamField body="emailVerified" type="boolean">
+  Whether the user's email has been verified
+</ParamField>
+
+<ParamField body="provider" type="string">
+  Authentication provider: `local`, `google`, or `invite`
+</ParamField>
+
+## Token Expiration
+
+JWT tokens have the following expiration times:
+
+| Token Type | Expiration |
+|------------|------------|
+| Login Token | 7 days |
+| Verification Token | 15 minutes |
+| Invitation Token | 48 hours |
+
+<Tip>
+Implement token refresh logic in your application to maintain user sessions seamlessly.
+</Tip>
+
+## Example: Complete Authentication Flow
+
+<Steps>
+<Step title="Register User">
+  Create a new user account:
+  
+  ```bash
+  curl -X POST 'http://localhost:3001/api/v1/auth/register' \
+    -H 'Content-Type: application/json' \
+    -d '{
+      "name": "John Doe",
+      "email": "john@example.com",
+      "phone": "+1234567890",
+      "password": "SecurePass123",
+      "companyName": "Acme Corp",
+      "subdomain": "acme"
+    }'
+  ```
+</Step>
+
+<Step title="Verify Email">
+  Check email and click verification link, or verify programmatically:
+  
+  ```bash
+  curl -X GET 'http://localhost:3001/api/v1/auth/verify?token=VERIFICATION_TOKEN'
+  ```
+</Step>
+
+<Step title="Login">
+  Authenticate to receive JWT token:
+  
+  ```bash
+  curl -X POST 'http://localhost:3001/api/v1/auth/login' \
+    -H 'Content-Type: application/json' \
+    -d '{
+      "email": "john@example.com",
+      "password": "SecurePass123"
+    }'
+  ```
+</Step>
+
+<Step title="Make Authenticated Requests">
+  Use the token for API calls:
+  
+  ```bash
+  curl -X GET 'http://localhost:3001/api/v1/users?enterprise=ENTERPRISE_ID' \
+    -H 'Authorization: Bearer YOUR_JWT_TOKEN'
+  ```
+</Step>
+</Steps>
+
+## Security Best Practices
+
+<Check>
+**Always use HTTPS** - Never send tokens over unencrypted connections
+</Check>
+
+<Check>
+**Store tokens securely** - Use secure storage mechanisms (e.g., HTTP-only cookies, encrypted storage)
+</Check>
+
+<Check>
+**Validate token expiration** - Check token expiration and refresh when needed
+</Check>
+
+<Check>
+**Use environment variables** - Never hardcode tokens or credentials in your code
+</Check>
+
+<Warning>
+If you suspect a token has been compromised, revoke it immediately by logging out and generating a new one.
+</Warning>
+
+## Multi-Enterprise Support
+
+Users can belong to multiple enterprises. When authenticating, you may need to specify which enterprise context you're operating in:
+
+```bash
+curl -X POST 'http://localhost:3001/api/v1/auth/login' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "email": "john@example.com",
+    "password": "SecurePass123",
+    "enterpriseId": "specific-enterprise-id"
+  }'
+```
+
+If a user belongs to multiple enterprises and doesn't specify one, the API will return:
+
+```json
+{
+  "requiresEnterpriseSelection": true,
+  "enterprises": [
+    {
+      "id": "enterprise-1",
+      "name": "Acme Corp",
+      "subdomain": "acme"
+    },
+    {
+      "id": "enterprise-2",
+      "name": "TechCo",
+      "subdomain": "techco"
+    }
+  ]
+}
+```
+
+## Related Endpoints
+
+<Card title="Register User" icon="user-plus" href="/api-reference/auth/register">
+  Create a new user account with email verification
+</Card>
+
+<Card title="Login" icon="right-to-bracket" href="/api-reference/auth/login">
+  Authenticate and receive JWT token
+</Card>
+
+<Card title="Invite User" icon="envelope" href="/api-reference/auth/invite">
+  Send invitation to join your enterprise
+</Card>
+
+
+
+
+
+

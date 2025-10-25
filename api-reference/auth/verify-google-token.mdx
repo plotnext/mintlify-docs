@@ -1,0 +1,294 @@
+---
+title: "Verify Google Token"
+api: "POST /api/v1/auth/verify-google-token"
+description: "Verify Google signup token for OAuth registration"
+icon: "google"
+---
+
+## Overview
+
+Verify a Google OAuth token generated during the Google signup process. This endpoint validates the temporary token containing Google user data and returns the verified user information for completing the registration process.
+
+## Authentication
+
+<Info>
+This endpoint does not require authentication - it's used to verify Google signup tokens during registration.
+</Info>
+
+## Request Body
+
+<ParamField body="token" type="string" required>
+  Google signup token from OAuth callback
+  
+  **Example**: `"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+</ParamField>
+
+## Response
+
+### Success Response
+
+<ResponseField name="valid" type="boolean">
+  Token validity: `true`
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's Google email address
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  User's full name from Google
+</ResponseField>
+
+<ResponseField name="picture" type="string">
+  User's profile picture URL from Google
+</ResponseField>
+
+<ResponseField name="providerId" type="string">
+  Google user ID
+</ResponseField>
+
+<ResponseField name="emailVerified" type="boolean">
+  Email verification status from Google
+</ResponseField>
+
+### Error Response
+
+<ResponseField name="valid" type="boolean">
+  Token validity: `false`
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message describing the issue
+</ResponseField>
+
+## Examples
+
+### Verify Google Signup Token
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/auth/verify-google-token' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/auth/verify-google-token', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+  })
+});
+
+const data = await response.json();
+
+if (data.valid) {
+  console.log('Google user data:', {
+    email: data.email,
+    name: data.name,
+    picture: data.picture
+  });
+} else {
+  console.log('Token verification failed:', data.error);
+}
+```
+
+```python Python
+import requests
+
+response = requests.post(
+  'http://localhost:3001/api/v1/auth/verify-google-token',
+  json={
+    'token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+  }
+)
+
+data = response.json()
+
+if data.get('valid'):
+  print(f"Google user: {data['name']} ({data['email']})")
+  print(f"Profile picture: {data['picture']}")
+else:
+  print(f"Token verification failed: {data['error']}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "valid": true,
+  "email": "john.doe@gmail.com",
+  "name": "John Doe",
+  "picture": "https://lh3.googleusercontent.com/a/ACg8ocK...",
+  "providerId": "123456789012345678901",
+  "emailVerified": true
+}
+```
+
+```json Invalid Token
+{
+  "valid": false,
+  "error": "Invalid or expired token"
+}
+```
+
+```json Wrong Token Type
+{
+  "valid": false,
+  "error": "Invalid token purpose"
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="valid" type="boolean">
+  Always `false` for error responses
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="400 - No Token Provided">
+```json
+{
+  "valid": false,
+  "error": "No token provided"
+}
+```
+
+The token parameter is missing from the request body.
+</Accordion>
+
+<Accordion title="400 - Invalid Token Purpose">
+```json
+{
+  "valid": false,
+  "error": "Invalid token purpose"
+}
+```
+
+The token is not a Google signup token (wrong purpose).
+</Accordion>
+
+<Accordion title="400 - Invalid or Expired Token">
+```json
+{
+  "valid": false,
+  "error": "Invalid or expired token"
+}
+```
+
+The token is malformed, expired, or cannot be verified.
+</Accordion>
+</AccordionGroup>
+
+## Google OAuth Registration Flow
+
+<Steps>
+<Step title="User Clicks Google Sign Up">
+  User initiates Google OAuth registration
+</Step>
+
+<Step title="Google OAuth Flow">
+  User authenticates with Google and grants permissions
+</Step>
+
+<Step title="OAuth Callback">
+  Google redirects to callback with authorization code
+</Step>
+
+<Step title="Token Exchange">
+  System exchanges code for Google user data
+</Step>
+
+<Step title="Create Signup Token">
+  System creates temporary JWT with Google user data
+</Step>
+
+<Step title="Redirect to Sign Up">
+  User is redirected to sign-up page with Google token
+</Step>
+
+<Step title="Verify Token">
+  This endpoint verifies the Google signup token
+</Step>
+
+<Step title="Complete Registration">
+  User completes registration with verified Google data
+</Step>
+</Steps>
+
+## Token Structure
+
+The Google signup token contains:
+- **Purpose**: `"google_signup"`
+- **Email**: User's Google email address
+- **Name**: User's full name from Google
+- **Phone**: Empty string (not provided by Google)
+- **Provider ID**: Google user ID
+- **Picture**: Profile picture URL
+- **Email Verified**: Verification status from Google
+- **Expiry**: Token expires in 10 minutes
+
+## Security Considerations
+
+- Tokens are short-lived (10 minutes) for security
+- Tokens are single-purpose (Google signup only)
+- Google user data is verified through OAuth
+- No sensitive information is stored in tokens
+- Tokens are signed and cannot be tampered with
+
+## Use Cases
+
+- **Google OAuth Registration**: Verify Google user data during signup
+- **Pre-fill Forms**: Auto-populate registration forms with Google data
+- **Profile Pictures**: Display Google profile pictures during registration
+- **Email Verification**: Use Google's email verification status
+
+## Frontend Integration
+
+```javascript
+// Extract token from URL parameters
+const urlParams = new URLSearchParams(window.location.search);
+const googleToken = urlParams.get('google_token');
+
+if (googleToken) {
+  // Verify the token
+  const response = await fetch('/api/v1/auth/verify-google-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: googleToken })
+  });
+  
+  const data = await response.json();
+  
+  if (data.valid) {
+    // Pre-fill registration form with Google data
+    document.getElementById('email').value = data.email;
+    document.getElementById('name').value = data.name;
+    document.getElementById('profile-picture').src = data.picture;
+  }
+}
+```
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Register" icon="user-plus" href="/api-reference/auth/register">
+  Complete registration with verified Google data
+</Card>
+
+<Card title="Google OAuth" icon="google" href="/api-reference/google/oauth">
+  Start Google OAuth flow
+</Card>
+</CardGroup>

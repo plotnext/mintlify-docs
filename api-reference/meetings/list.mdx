@@ -1,0 +1,513 @@
+---
+title: "List Meetings"
+api: "GET /api/v1/meetings"
+description: "Retrieve meetings with flexible filtering options"
+icon: "list"
+---
+
+## Overview
+
+Fetch a list of meetings within a specified time window, optionally filtered by organizational units and participants. This endpoint provides flexible querying capabilities for meeting analytics and dashboards.
+
+## Authentication
+
+<Warning>
+This endpoint requires authentication via JWT token.
+</Warning>
+
+Provide authentication via:
+- **Authorization header**: `Authorization: Bearer YOUR_TOKEN` (required)
+
+## Query Parameters
+
+<ParamField query="enterprise_id" type="string" required>
+  Enterprise ID to filter meetings by. If not provided, uses the `enterpriseId` from JWT token.
+  
+  **Format**: UUID
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"`
+</ParamField>
+
+<ParamField query="org_unit_id" type="string or array">
+  Organizational unit ID(s) to filter meetings by. Can be a single value or comma-separated list. Can also be provided multiple times as separate parameters.
+  
+  **Format**: UUID or comma-separated UUIDs
+  
+  **Example**: `"dept-1"` or `"dept-1,dept-2"` or `?org_unit_id=dept-1&org_unit_id=dept-2`
+  
+  **Default**: Uses `defaultOrgUnitId` from JWT if not specified
+</ParamField>
+
+<ParamField query="participant_id" type="string">
+  Filter meetings where this user is the host or a participant. If not provided, uses the authenticated user's ID from JWT token (`sub` claim).
+  
+  **Format**: UUID
+  
+  **Example**: `"user-123"`
+</ParamField>
+
+<ParamField query="interval" type="string">
+  Time window to look back from now. Meetings with `scheduled_start_at` within this interval are returned.
+  
+  **Format**: `{number} {unit}` where unit is: `minute(s)`, `hour(s)`, `day(s)`, or `week(s)`
+  
+  **Default**: `"7 days"`
+  
+  **Examples**: `"1 day"`, `"24 hours"`, `"2 weeks"`, `"30 minutes"`
+</ParamField>
+
+## Response
+
+<ResponseField name="meetings" type="array">
+  Array of meeting objects with aggregated participant information
+  
+  <Expandable title="Meeting Object">
+    <ResponseField name="title" type="string">
+      Meeting title
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Meeting status: `"scheduled"`, `"skip"`, `"in_progress"`, `"cancelled"`, `"completed"`, `"deleted"`, or `"error"`
+    </ResponseField>
+    
+    <ResponseField name="scheduled_start_at" type="string">
+      Scheduled start timestamp (ISO 8601)
+    </ResponseField>
+    
+    <ResponseField name="duration" type="string">
+      Meeting duration as PostgreSQL interval (e.g., `"01:00:00"` for 1 hour)
+    </ResponseField>
+    
+    <ResponseField name="host_user_id" type="string | null">
+      ID of the meeting host (if assigned)
+    </ResponseField>
+    
+    <ResponseField name="participant_count" type="number">
+      Number of participants with registered user IDs
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### List Recent Meetings
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/meetings?enterprise_id=550e8400-e29b-41d4-a716-446655440000' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```javascript JavaScript
+const response = await fetch(
+  '/api/v1/meetings?enterprise_id=550e8400-e29b-41d4-a716-446655440000',
+  {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  }
+);
+
+const data = await response.json();
+console.log(`Found ${data.meetings.length} meetings`);
+```
+
+```python Python
+import requests
+
+response = requests.get(
+  'http://localhost:3001/api/v1/meetings',
+  headers={'Authorization': f'Bearer {token}'},
+  params={'enterprise_id': '550e8400-e29b-41d4-a716-446655440000'}
+)
+
+data = response.json()
+print(f"Found {len(data['meetings'])} meetings")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "meetings": [
+    {
+      "title": "Q1 Planning Review",
+      "status": "completed",
+      "scheduled_start_at": "2024-03-15T14:00:00Z",
+      "duration": "01:00:00",
+      "host_user_id": "user-123",
+      "participant_count": 5
+    },
+    {
+      "title": "Team Standup",
+      "status": "scheduled",
+      "scheduled_start_at": "2024-03-20T09:00:00Z",
+      "duration": "00:30:00",
+      "host_user_id": "user-456",
+      "participant_count": 8
+    },
+    {
+      "title": "Client Demo",
+      "status": "in_progress",
+      "scheduled_start_at": "2024-03-18T16:00:00Z",
+      "duration": "00:45:00",
+      "host_user_id": null,
+      "participant_count": 3
+    }
+  ]
+}
+```
+</ResponseExample>
+
+### Filter by Time Interval
+
+<RequestExample>
+```bash Last 24 Hours
+curl -X GET 'http://localhost:3001/api/v1/meetings?enterprise_id=ENTERPRISE_ID&interval=1%20day' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```bash Last 2 Weeks
+curl -X GET 'http://localhost:3001/api/v1/meetings?enterprise_id=ENTERPRISE_ID&interval=2%20weeks' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```javascript JavaScript
+// Last 30 days
+const response = await fetch(
+  `/api/v1/meetings?enterprise_id=${enterpriseId}&interval=30 days`,
+  {
+    headers: { 'Authorization': `Bearer ${token}` }
+  }
+);
+
+const data = await response.json();
+```
+</RequestExample>
+
+### Filter by Organizational Units
+
+<RequestExample>
+```bash Single Org Unit
+curl -X GET 'http://localhost:3001/api/v1/meetings?enterprise_id=ENTERPRISE_ID&org_unit_id=dept-1' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```bash Multiple Org Units (Comma-separated)
+curl -X GET 'http://localhost:3001/api/v1/meetings?enterprise_id=ENTERPRISE_ID&org_unit_id=dept-1,dept-2,dept-3' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```bash Multiple Org Units (Separate Parameters)
+curl -X GET 'http://localhost:3001/api/v1/meetings?enterprise_id=ENTERPRISE_ID&org_unit_id=dept-1&org_unit_id=dept-2' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```javascript JavaScript
+// Using URLSearchParams for multiple values
+const params = new URLSearchParams({
+  enterprise_id: enterpriseId,
+  interval: '7 days'
+});
+
+// Add multiple org units
+['dept-1', 'dept-2', 'dept-3'].forEach(id => {
+  params.append('org_unit_id', id);
+});
+
+const response = await fetch(`/api/v1/meetings?${params}`, {
+  headers: { 'Authorization': `Bearer ${token}` }
+});
+```
+</RequestExample>
+
+### Filter by Participant
+
+<RequestExample>
+```bash Specific User's Meetings
+curl -X GET 'http://localhost:3001/api/v1/meetings?enterprise_id=ENTERPRISE_ID&participant_id=user-123' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```bash Current User's Meetings (Default)
+curl -X GET 'http://localhost:3001/api/v1/meetings?enterprise_id=ENTERPRISE_ID' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```javascript JavaScript
+// Get meetings for specific user
+const response = await fetch(
+  `/api/v1/meetings?enterprise_id=${enterpriseId}&participant_id=${userId}`,
+  {
+    headers: { 'Authorization': `Bearer ${token}` }
+  }
+);
+
+// Get meetings for authenticated user (omit participant_id)
+const myMeetings = await fetch(
+  `/api/v1/meetings?enterprise_id=${enterpriseId}`,
+  {
+    headers: { 'Authorization': `Bearer ${token}` }
+  }
+);
+```
+</RequestExample>
+
+### Advanced Filtering
+
+<RequestExample>
+```bash Combined Filters
+curl -X GET 'http://localhost:3001/api/v1/meetings?enterprise_id=ENTERPRISE_ID&org_unit_id=sales-dept&participant_id=user-123&interval=30%20days' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+```javascript JavaScript
+const params = new URLSearchParams({
+  enterprise_id: '550e8400-e29b-41d4-a716-446655440000',
+  org_unit_id: 'sales-dept',
+  participant_id: 'user-123',
+  interval: '30 days'
+});
+
+const response = await fetch(`/api/v1/meetings?${params}`, {
+  headers: { 'Authorization': `Bearer ${token}` }
+});
+
+const data = await response.json();
+```
+</RequestExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Unauthorized">
+```json
+{
+  "error": "Invalid or missing token"
+}
+```
+
+Missing or invalid JWT token.
+</Accordion>
+
+<Accordion title="400 - Missing Enterprise">
+```json
+{
+  "error": "enterprise_id is required"
+}
+```
+
+Enterprise ID not provided and not found in JWT token.
+</Accordion>
+
+<Accordion title="400 - Invalid Enterprise ID">
+```json
+{
+  "error": "invalid enterprise_id"
+}
+```
+
+Enterprise ID is not a valid UUID format.
+</Accordion>
+
+<Accordion title="400 - Invalid Org Unit ID">
+```json
+{
+  "error": "invalid org_unit_id"
+}
+```
+
+One or more org unit IDs are not valid UUIDs.
+</Accordion>
+
+<Accordion title="400 - Invalid Participant ID">
+```json
+{
+  "error": "invalid participant_id"
+}
+```
+
+Participant ID is not a valid UUID format.
+</Accordion>
+
+<Accordion title="400 - Invalid Interval">
+```json
+{
+  "error": "invalid interval"
+}
+```
+
+Interval format is incorrect. Must match pattern: `{number} {unit}` where unit is minute(s), hour(s), day(s), or week(s).
+</Accordion>
+
+<Accordion title="500 - Internal Server Error">
+```json
+{
+  "error": "internal_server_error"
+}
+```
+
+Database or server error occurred.
+</Accordion>
+</AccordionGroup>
+
+## Query Behavior
+
+### Enterprise Filtering
+The `enterprise_id` parameter is **required**. It can be:
+1. Explicitly provided in query parameters
+2. Automatically extracted from JWT token's `enterpriseId` claim
+
+### Participant Filtering
+
+The endpoint filters meetings where the specified user is:
+- **Host**: `host_user_id` matches the participant ID
+- **OR Participant**: User ID exists in the `participants` table for the meeting
+
+If `participant_id` is not provided, uses the authenticated user's ID from JWT token (`sub` claim).
+
+### Time Window Filtering
+
+Meetings are filtered by `scheduled_start_at`:
+```sql
+WHERE scheduled_start_at > NOW() - interval
+```
+
+**Example**: If `interval = "7 days"`, only meetings scheduled within the last 7 days (from now) are returned.
+
+### Org Unit Filtering
+
+When `org_unit_id` is provided:
+- Meetings must belong to one of the specified org units
+- Multiple org units can be specified (OR logic)
+- If not provided, uses `defaultOrgUnitId` from JWT
+
+### Result Ordering
+
+Results are ordered by `scheduled_start_at` **descending** (most recent first).
+
+## Duration Format
+
+The `duration` field is a PostgreSQL interval representing the difference between `scheduled_end_at` and `scheduled_start_at`:
+
+- `"00:30:00"` = 30 minutes
+- `"01:00:00"` = 1 hour
+- `"01:30:00"` = 1 hour 30 minutes
+- `"02:15:00"` = 2 hours 15 minutes
+
+<Tip>
+Parse the interval string to display human-readable durations in your UI:
+```javascript
+function formatDuration(interval) {
+  const [hours, minutes] = interval.split(':');
+  return `${parseInt(hours)}h ${parseInt(minutes)}m`;
+}
+```
+</Tip>
+
+## Participant Count
+
+The `participant_count` field represents the number of participants who are **registered users** (have a `user_id` in the `participants` table).
+
+- External participants (no `user_id`) are not counted
+- Only participants with valid user accounts are included
+
+## Performance Considerations
+
+<Check>
+**Indexed Queries**: Enterprise, org unit, and participant filters use database indexes
+</Check>
+
+<Check>
+**Time Window**: Smaller intervals (e.g., 1 day) return faster than larger ones (e.g., 90 days)
+</Check>
+
+<Check>
+**Aggregation**: Participant counts are aggregated in the database for efficiency
+</Check>
+
+<Tip>
+For best performance, always specify an appropriate time interval rather than using the default 7 days if you only need recent meetings.
+</Tip>
+
+## Common Use Cases
+
+<AccordionGroup>
+<Accordion title="Dashboard - Upcoming Meetings">
+```javascript
+// Get meetings in next 24 hours
+const upcoming = await fetch(
+  `/api/v1/meetings?enterprise_id=${enterpriseId}&interval=1 day`,
+  { headers: { 'Authorization': `Bearer ${token}` } }
+).then(r => r.json());
+
+// Filter for scheduled only
+const scheduledMeetings = upcoming.meetings
+  .filter(m => m.status === 'scheduled')
+  .sort((a, b) => new Date(a.scheduled_start_at) - new Date(b.scheduled_start_at));
+```
+</Accordion>
+
+<Accordion title="Analytics - Team Meeting Statistics">
+```javascript
+// Get all meetings for a department over last 30 days
+const stats = await fetch(
+  `/api/v1/meetings?enterprise_id=${enterpriseId}&org_unit_id=${deptId}&interval=30 days`,
+  { headers: { 'Authorization': `Bearer ${token}` } }
+).then(r => r.json());
+
+const completed = stats.meetings.filter(m => m.status === 'completed').length;
+const cancelled = stats.meetings.filter(m => m.status === 'cancelled').length;
+const avgParticipants = stats.meetings.reduce((sum, m) => sum + m.participant_count, 0) / stats.meetings.length;
+```
+</Accordion>
+
+<Accordion title="Personal Schedule">
+```javascript
+// Get my meetings for the next 7 days
+const mySchedule = await fetch(
+  `/api/v1/meetings?enterprise_id=${enterpriseId}`,
+  { headers: { 'Authorization': `Bearer ${token}` } }
+).then(r => r.json());
+
+// Meetings are automatically filtered by current user (from JWT)
+```
+</Accordion>
+
+<Accordion title="Multi-Department View">
+```javascript
+// Get meetings across multiple departments
+const deptIds = ['sales-dept', 'cs-dept', 'eng-dept'];
+const params = new URLSearchParams({ enterprise_id: enterpriseId });
+deptIds.forEach(id => params.append('org_unit_id', id));
+
+const multiDept = await fetch(`/api/v1/meetings?${params}`, {
+  headers: { 'Authorization': `Bearer ${token}` }
+}).then(r => r.json());
+```
+</Accordion>
+</AccordionGroup>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Create Meeting" icon="calendar-plus" href="/api-reference/meetings/create">
+  Create a new meeting or update existing
+</Card>
+
+<Card title="List Org Units" icon="sitemap" href="/api-reference/org/org-units-list">
+  Get organizational units for filtering
+</Card>
+</CardGroup>
+
+
+
+
+
+

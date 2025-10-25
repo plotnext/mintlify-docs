@@ -1,0 +1,613 @@
+---
+title: "Create Organizational Unit"
+api: "POST /api/v1/org-units"
+description: "Create a new organizational unit in your enterprise"
+icon: "plus"
+---
+
+## Overview
+
+Create a new organizational unit (department, team, division) within your enterprise. Org units can be created at the root level or as children of existing org units, allowing you to build a hierarchical organizational structure.
+
+## Authentication
+
+<Warning>
+This endpoint requires authentication. Include your JWT token in the request.
+</Warning>
+
+Provide authentication via:
+- **Authorization header**: `Authorization: Bearer YOUR_TOKEN`
+- **Cookie**: `auth_token` (automatically included in browser requests)
+
+## Request Body
+
+<ParamField body="name" type="string" required>
+  Name of the organizational unit. Must be at least 1 character (after trimming).
+  
+  **Example**: `"Sales EMEA"`, `"Engineering"`, `"Customer Success"`
+</ParamField>
+
+<ParamField body="type" type="string">
+  Type of organizational unit
+  
+  **Options**: `"sales"`, `"cs"`, `"onboarding"`, `"exec"`
+  
+  **Default**: `"exec"`
+</ParamField>
+
+<ParamField body="parentId" type="string">
+  Parent organizational unit ID. If provided, the new org unit becomes a child of the specified parent. If omitted, creates a root-level org unit.
+  
+  **Format**: UUID
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"`
+</ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">
+  Success message: `"Org unit created successfully"`
+</ResponseField>
+
+<ResponseField name="orgUnit" type="object">
+  Created organizational unit object
+  
+  <Expandable title="Org Unit Object">
+    <ResponseField name="id" type="string">
+      Org unit unique identifier (UUID)
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Org unit name
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Org unit type
+    </ResponseField>
+    
+    <ResponseField name="parentId" type="string | null">
+      Parent org unit ID (null if root level)
+    </ResponseField>
+    
+    <ResponseField name="enterpriseId" type="string">
+      Enterprise ID (from JWT token)
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      Creation timestamp (ISO 8601)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Create Root-Level Org Unit
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/org-units' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -d '{
+    "name": "Engineering",
+    "type": "exec"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/org-units', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    name: 'Engineering',
+    type: 'exec'
+  })
+});
+
+const data = await response.json();
+console.log('Created org unit:', data.orgUnit.id);
+```
+
+```python Python
+import requests
+
+response = requests.post(
+  'http://localhost:3001/api/v1/org-units',
+  headers={
+    'Authorization': f'Bearer {token}',
+    'Content-Type': 'application/json'
+  },
+  json={
+    'name': 'Engineering',
+    'type': 'exec'
+  }
+)
+
+data = response.json()
+print(f"Created org unit: {data['orgUnit']['id']}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success (201 Created)
+{
+  "message": "Org unit created successfully",
+  "orgUnit": {
+    "id": "org-unit-abc123",
+    "name": "Engineering",
+    "type": "exec",
+    "parentId": null,
+    "enterpriseId": "550e8400-e29b-41d4-a716-446655440000",
+    "createdAt": "2024-03-15T10:30:00Z"
+  }
+}
+```
+</ResponseExample>
+
+### Create Child Org Unit
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/org-units' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -d '{
+    "name": "Sales EMEA",
+    "type": "sales",
+    "parentId": "sales-dept-id"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/org-units', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    name: 'Sales EMEA',
+    type: 'sales',
+    parentId: 'sales-dept-id'
+  })
+});
+
+const data = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.post(
+  'http://localhost:3001/api/v1/org-units',
+  headers={
+    'Authorization': f'Bearer {token}',
+    'Content-Type': 'application/json'
+  },
+  json={
+    'name': 'Sales EMEA',
+    'type': 'sales',
+    'parentId': 'sales-dept-id'
+  }
+)
+
+data = response.json()
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success with Parent
+{
+  "message": "Org unit created successfully",
+  "orgUnit": {
+    "id": "org-unit-def456",
+    "name": "Sales EMEA",
+    "type": "sales",
+    "parentId": "sales-dept-id",
+    "enterpriseId": "550e8400-e29b-41d4-a716-446655440000",
+    "createdAt": "2024-03-15T10:35:00Z"
+  }
+}
+```
+</ResponseExample>
+
+### Create Multiple Nested Levels
+
+<RequestExample>
+```javascript JavaScript
+// Create hierarchy: Sales > Sales EMEA > Sales UK
+
+// 1. Create Sales department
+const sales = await fetch('/api/v1/org-units', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    name: 'Sales',
+    type: 'sales'
+  })
+}).then(r => r.json());
+
+// 2. Create Sales EMEA under Sales
+const salesEMEA = await fetch('/api/v1/org-units', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    name: 'Sales EMEA',
+    type: 'sales',
+    parentId: sales.orgUnit.id
+  })
+}).then(r => r.json());
+
+// 3. Create Sales UK under Sales EMEA
+const salesUK = await fetch('/api/v1/org-units', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    name: 'Sales UK',
+    type: 'sales',
+    parentId: salesEMEA.orgUnit.id
+  })
+}).then(r => r.json());
+
+console.log('Created hierarchy:', {
+  sales: sales.orgUnit.id,
+  salesEMEA: salesEMEA.orgUnit.id,
+  salesUK: salesUK.orgUnit.id
+});
+```
+</RequestExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Unauthorized">
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+Missing or invalid authentication token.
+</Accordion>
+
+<Accordion title="400 - Missing Name">
+```json
+{
+  "error": "Name is required"
+}
+```
+
+Name field is missing, empty, or contains only whitespace.
+</Accordion>
+
+<Accordion title="400 - Invalid Type">
+```json
+{
+  "error": "Invalid type. Must be one of: sales, cs, onboarding, exec"
+}
+```
+
+Provided type is not one of the allowed values.
+</Accordion>
+
+<Accordion title="404 - Parent Not Found">
+```json
+{
+  "error": "Parent org unit not found or does not belong to your enterprise"
+}
+```
+
+The specified `parentId`:
+- Doesn't exist in the database
+- Belongs to a different enterprise
+- Is not a valid UUID
+</Accordion>
+
+<Accordion title="500 - Internal Server Error">
+```json
+{
+  "error": "Internal server error"
+}
+```
+
+An unexpected error occurred while creating the org unit.
+</Accordion>
+</AccordionGroup>
+
+## Org Unit Types
+
+<ParamField body="type" type="string">
+  <Accordion title="sales">
+    Sales departments, regional sales teams, and sales-related units
+    
+    **Use for**: Sales teams, account executives, business development
+  </Accordion>
+  
+  <Accordion title="cs">
+    Customer success and customer support teams
+    
+    **Use for**: Customer success managers, support teams, account management
+  </Accordion>
+  
+  <Accordion title="onboarding">
+    Customer onboarding and implementation teams
+    
+    **Use for**: Implementation specialists, onboarding coordinators
+  </Accordion>
+  
+  <Accordion title="exec">
+    Executive, leadership, and general organizational units
+    
+    **Use for**: Engineering, Product, Operations, Executive team
+    
+    **Note**: Default type if not specified
+  </Accordion>
+</ParamField>
+
+## Hierarchical Organization
+
+### Creating a Hierarchy
+
+You can create multi-level hierarchies by setting the `parentId`:
+
+```
+Company (root, parentId: null)
+├── Sales (parentId: company-id)
+│   ├── Sales EMEA (parentId: sales-id)
+│   │   ├── Sales UK (parentId: sales-emea-id)
+│   │   └── Sales France (parentId: sales-emea-id)
+│   └── Sales APAC (parentId: sales-id)
+├── Engineering (parentId: company-id)
+└── Customer Success (parentId: company-id)
+```
+
+### Best Practices
+
+<Check>
+**Start with root units**: Create top-level departments first
+</Check>
+
+<Check>
+**Use meaningful names**: Clear, descriptive names help with navigation
+</Check>
+
+<Check>
+**Consistent types**: Use the same type for related units (e.g., all sales units use type "sales")
+</Check>
+
+<Check>
+**Logical hierarchy**: Mirror your actual organizational structure
+</Check>
+
+<Tip>
+Plan your org unit hierarchy before creating units. Restructuring later requires updating parent relationships.
+</Tip>
+
+## Closure Table Management
+
+When an org unit is created, the system automatically manages the **closure table** (`org_unit_closure`) which tracks ancestor-descendant relationships:
+
+### For Root Org Unit
+- Creates a self-reference at level 0
+
+### For Child Org Unit
+1. Copies all ancestor relationships from parent
+2. Increments level for each relationship
+3. Adds self-reference at level 0
+
+**Example**: Creating `Sales UK` under `Sales EMEA` under `Sales`:
+
+```
+Closure entries created:
+- Sales → Sales UK (level 2)
+- Sales EMEA → Sales UK (level 1)
+- Sales UK → Sales UK (level 0, self-reference)
+```
+
+<Note>
+The closure table enables efficient queries like "find all descendants" or "find all ancestors" without recursive queries.
+</Note>
+
+## Enterprise Isolation
+
+All org units are isolated by enterprise:
+
+<Check>
+**Automatic enterprise assignment**: Uses `enterpriseId` from JWT token
+</Check>
+
+<Check>
+**Parent validation**: Parent must belong to the same enterprise
+</Check>
+
+<Check>
+**Query filtering**: List endpoints only return org units for your enterprise
+</Check>
+
+<Warning>
+You cannot create org units in other enterprises or reference org units from other enterprises as parents.
+</Warning>
+
+## After Creating an Org Unit
+
+Once created, you can:
+
+1. **Assign users** to the org unit via the invite endpoint
+2. **Create meetings** scoped to the org unit
+3. **Create child org units** with this unit as parent
+4. **Assign roles** scoped to this org unit
+
+## Common Use Cases
+
+<AccordionGroup>
+<Accordion title="Setup Regional Sales Structure">
+```javascript
+// Create sales department and regional subdivisions
+async function setupSalesStructure() {
+  // Create main Sales unit
+  const sales = await createOrgUnit({ name: 'Sales', type: 'sales' });
+  
+  // Create regional units
+  const regions = ['EMEA', 'APAC', 'Americas'];
+  const regionalUnits = await Promise.all(
+    regions.map(region =>
+      createOrgUnit({
+        name: `Sales ${region}`,
+        type: 'sales',
+        parentId: sales.orgUnit.id
+      })
+    )
+  );
+  
+  return { sales, regionalUnits };
+}
+
+async function createOrgUnit(data) {
+  return fetch('/api/v1/org-units', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(data)
+  }).then(r => r.json());
+}
+```
+</Accordion>
+
+<Accordion title="Create Team Within Department">
+```javascript
+// Find parent department
+const { orgUnits } = await fetch('/api/v1/org-units', {
+  headers: { 'Authorization': `Bearer ${token}` }
+}).then(r => r.json());
+
+const engineering = orgUnits.find(u => u.name === 'Engineering');
+
+// Create sub-team
+const frontend = await fetch('/api/v1/org-units', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    name: 'Frontend Team',
+    type: 'exec',
+    parentId: engineering.id
+  })
+}).then(r => r.json());
+
+console.log('Created team:', frontend.orgUnit.name);
+```
+</Accordion>
+
+<Accordion title="Bulk Create Org Structure">
+```javascript
+// Define org structure
+const structure = [
+  { name: 'Engineering', type: 'exec', parent: null },
+  { name: 'Frontend', type: 'exec', parent: 'Engineering' },
+  { name: 'Backend', type: 'exec', parent: 'Engineering' },
+  { name: 'Sales', type: 'sales', parent: null },
+  { name: 'Sales EMEA', type: 'sales', parent: 'Sales' },
+  { name: 'Sales APAC', type: 'sales', parent: 'Sales' }
+];
+
+async function createOrgStructure(structure) {
+  const created = new Map();
+  
+  for (const unit of structure) {
+    const parentId = unit.parent ? created.get(unit.parent) : null;
+    
+    const response = await fetch('/api/v1/org-units', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        name: unit.name,
+        type: unit.type,
+        parentId
+      })
+    }).then(r => r.json());
+    
+    created.set(unit.name, response.orgUnit.id);
+    console.log(`Created: ${unit.name}`);
+  }
+  
+  return created;
+}
+
+await createOrgStructure(structure);
+```
+</Accordion>
+</AccordionGroup>
+
+## Validation Rules
+
+<ParamField body="name">
+  **Required**: Yes  
+  **Min length**: 1 character (after trimming)  
+  **Validation**: Trimmed before saving
+</ParamField>
+
+<ParamField body="type">
+  **Required**: No (defaults to "exec")  
+  **Valid values**: `"sales"`, `"cs"`, `"onboarding"`, `"exec"`  
+  **Case sensitive**: Must be lowercase
+</ParamField>
+
+<ParamField body="parentId">
+  **Required**: No (creates root unit if omitted)  
+  **Format**: Valid UUID  
+  **Validation**: 
+  - Must exist in database
+  - Must belong to same enterprise
+  - Must be from same enterprise as authenticated user
+</ParamField>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="List Org Units" icon="list" href="/api-reference/org/org-units-list">
+  View all organizational units
+</Card>
+
+<Card title="Invite User" icon="envelope" href="/api-reference/auth/invite">
+  Assign users to org units when inviting
+</Card>
+
+<Card title="List Users" icon="users" href="/api-reference/users/list">
+  Filter users by org unit
+</Card>
+
+<Card title="Create Meeting" icon="calendar-plus" href="/api-reference/meetings/create">
+  Create meetings scoped to org units
+</Card>
+</CardGroup>
+
+
+
+
+
+

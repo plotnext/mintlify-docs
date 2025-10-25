@@ -1,0 +1,380 @@
+---
+title: "Get Meeting Transcript"
+api: "GET /api/v1/meetings/[id]/transcript"
+description: "Get meeting transcript with pagination and speaker filtering"
+icon: "file-text"
+---
+
+## Overview
+
+Retrieve the transcript for a specific meeting with support for pagination and speaker filtering. This endpoint returns transcript segments with timestamps, speaker information, and formatted text.
+
+## Authentication
+
+<Note>
+Authentication is optional for this endpoint. If provided, it will be validated and used for permission checks.
+</Note>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Meeting ID (must be a valid UUID)
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"`
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="limit" type="number">
+  Maximum number of transcript segments to return (default: 1000)
+  
+  **Example**: `100`
+</ParamField>
+
+<ParamField query="offset" type="number">
+  Number of segments to skip for pagination (default: 0)
+  
+  **Example**: `50`
+</ParamField>
+
+<ParamField query="speaker" type="string">
+  Filter segments by speaker name (case-insensitive partial match)
+  
+  **Example**: `"John"`
+</ParamField>
+
+## Response
+
+### Success Response
+
+<ResponseField name="success" type="boolean">
+  Success indicator: `true`
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Transcript data
+
+  <Expandable title="Data Object">
+    <ResponseField name="meetingId" type="string">
+      Meeting ID
+    </ResponseField>
+    
+    <ResponseField name="segmentCount" type="number">
+      Number of segments returned in this response
+    </ResponseField>
+    
+    <ResponseField name="totalSegments" type="number">
+      Total number of segments available (for pagination)
+    </ResponseField>
+    
+    <ResponseField name="pagination" type="object">
+      Pagination information
+
+      <Expandable title="Pagination Object">
+        <ResponseField name="limit" type="number">
+          Maximum segments per page
+        </ResponseField>
+        
+        <ResponseField name="offset" type="number">
+          Current offset
+        </ResponseField>
+        
+        <ResponseField name="hasMore" type="boolean">
+          Whether there are more segments available
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="segments" type="array">
+      List of transcript segments
+
+      <Expandable title="Transcript Segment Object">
+        <ResponseField name="id" type="string">
+          Segment ID
+        </ResponseField>
+        
+        <ResponseField name="startMs" type="number">
+          Start time in milliseconds
+        </ResponseField>
+        
+        <ResponseField name="endMs" type="number">
+          End time in milliseconds
+        </ResponseField>
+        
+        <ResponseField name="timestamp" type="string">
+          Formatted timestamp (HH:MM:SS)
+        </ResponseField>
+        
+        <ResponseField name="speakerName" type="string">
+          Speaker name (resolved from transcript, user, or participant data)
+        </ResponseField>
+        
+        <ResponseField name="text" type="string">
+          Transcript text
+        </ResponseField>
+        
+        <ResponseField name="participantId" type="string">
+          Participant ID (optional)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Get Full Transcript
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000/transcript' \
+  -H 'Authorization: Bearer your_jwt_token_here'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000/transcript', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer your_jwt_token_here'
+  }
+});
+
+const data = await response.json();
+
+if (data.success) {
+  console.log('Total segments:', data.data.totalSegments);
+  console.log('Returned segments:', data.data.segmentCount);
+  
+  data.data.segments.forEach(segment => {
+    console.log(`[${segment.timestamp}] ${segment.speakerName}: ${segment.text}`);
+  });
+}
+```
+
+```python Python
+import requests
+
+response = requests.get(
+  'http://localhost:3001/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000/transcript',
+  headers={'Authorization': 'Bearer your_jwt_token_here'}
+)
+
+data = response.json()
+
+if data.get('success'):
+  segments = data['data']['segments']
+  total = data['data']['totalSegments']
+  
+  print(f"Showing {len(segments)} of {total} segments")
+  
+  for segment in segments:
+    print(f"[{segment['timestamp']}] {segment['speakerName']}: {segment['text']}")
+```
+</RequestExample>
+
+### Get Paginated Transcript
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000/transcript?limit=50&offset=100' \
+  -H 'Authorization: Bearer your_jwt_token_here'
+```
+
+```javascript JavaScript
+// Get second page of transcript
+const response = await fetch('/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000/transcript?limit=50&offset=100', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer your_jwt_token_here'
+  }
+});
+
+const data = await response.json();
+
+if (data.success) {
+  const pagination = data.data.pagination;
+  console.log(`Page: ${pagination.offset / pagination.limit + 1}`);
+  console.log(`Has more: ${pagination.hasMore}`);
+}
+```
+</RequestExample>
+
+### Filter by Speaker
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000/transcript?speaker=John' \
+  -H 'Authorization: Bearer your_jwt_token_here'
+```
+
+```javascript JavaScript
+// Get only segments from John
+const response = await fetch('/api/v1/meetings/550e8400-e29b-41d4-a716-446655440000/transcript?speaker=John', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer your_jwt_token_here'
+  }
+});
+
+const data = await response.json();
+
+if (data.success) {
+  console.log(`Found ${data.data.segmentCount} segments from John`);
+  data.data.segments.forEach(segment => {
+    console.log(`[${segment.timestamp}] ${segment.text}`);
+  });
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "success": true,
+  "data": {
+    "meetingId": "550e8400-e29b-41d4-a716-446655440000",
+    "segmentCount": 3,
+    "totalSegments": 45,
+    "pagination": {
+      "limit": 1000,
+      "offset": 0,
+      "hasMore": false
+    },
+    "segments": [
+      {
+        "id": "seg-1",
+        "startMs": 0,
+        "endMs": 2500,
+        "timestamp": "00:00:00",
+        "speakerName": "John Doe",
+        "text": "Good morning everyone, let's start with our weekly standup.",
+        "participantId": "part-1"
+      },
+      {
+        "id": "seg-2",
+        "startMs": 2500,
+        "endMs": 4000,
+        "timestamp": "00:00:02",
+        "speakerName": "Jane Smith",
+        "text": "Morning John, I'm ready to go.",
+        "participantId": "part-2"
+      },
+      {
+        "id": "seg-3",
+        "startMs": 4000,
+        "endMs": 6000,
+        "timestamp": "00:00:04",
+        "speakerName": "John Doe",
+        "text": "Great, let's start with the project updates.",
+        "participantId": "part-1"
+      }
+    ]
+  }
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="400 - Invalid Meeting ID Format">
+```json
+{
+  "error": "Invalid meeting ID format",
+  "message": "Meeting ID must be a valid UUID"
+}
+```
+
+The meeting ID is not a valid UUID format.
+</Accordion>
+
+<Accordion title="404 - Meeting Not Found">
+```json
+{
+  "error": "Meeting not found",
+  "message": "This meeting does not exist"
+}
+```
+
+The meeting doesn't exist.
+</Accordion>
+
+<Accordion title="401 - Invalid Token">
+```json
+{
+  "error": "Invalid token"
+}
+```
+
+The provided authentication token is invalid.
+</Accordion>
+
+<Accordion title="403 - Forbidden">
+```json
+{
+  "error": "Forbidden"
+}
+```
+
+The user doesn't have permission to access this meeting.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "error": "Internal server error",
+  "message": "Failed to fetch transcript"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## Pagination Strategy
+
+For large meetings with many transcript segments:
+
+1. **Start with reasonable limit**: Use `limit=100` for initial requests
+2. **Check pagination info**: Use `hasMore` to determine if more data exists
+3. **Calculate offset**: `offset = page * limit` for subsequent requests
+4. **Handle empty results**: Some pages may be empty if speaker filtering is applied
+
+## Speaker Name Resolution
+
+Speaker names are resolved in this priority order:
+1. **User name**: From linked user account
+2. **Participant display name**: From participant record
+3. **Transcript speaker name**: From original transcript data
+4. **Fallback**: "Unknown" if no name available
+
+## Use Cases
+
+- **Meeting Review**: Read through complete meeting transcripts
+- **Speaker Analysis**: Find all segments from specific speakers
+- **Search Functionality**: Implement search within meeting transcripts
+- **Pagination**: Handle large meetings with many segments efficiently
+- **Export**: Generate transcript exports for documentation
+
+## Performance Considerations
+
+- Large meetings may have thousands of transcript segments
+- Use pagination for better performance and user experience
+- Speaker filtering reduces data transfer for focused queries
+- Consider implementing search functionality on the frontend
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Get Meeting Details" icon="calendar-days" href="/api-reference/meetings/get">
+  Get comprehensive meeting information including transcript summary
+</Card>
+
+<Card title="Get Meeting Participants" icon="users" href="/api-reference/meetings/participants">
+  Get participant information with talk time analysis
+</Card>
+</CardGroup>

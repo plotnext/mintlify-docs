@@ -1,0 +1,360 @@
+---
+title: "Create Calendar Events"
+api: "POST /api/v1/create-calendar"
+description: "Import calendar events and create meetings from external calendar data"
+icon: "calendar-plus"
+---
+
+## Overview
+
+Import calendar events from external sources (like Google Calendar) and create corresponding meeting records in the system. This endpoint processes calendar events and creates meetings with proper organizational unit assignments.
+
+## Authentication
+
+<Info>
+This endpoint requires authentication via JWT token (Bearer token or auth cookie).
+</Info>
+
+## Request Body
+
+<ParamField body="events" type="array" required>
+  Array of calendar events to import
+
+  <Expandable title="Calendar Event Object">
+    <ResponseField name="summary" type="string">
+      Event title/summary
+    </ResponseField>
+    
+    <ResponseField name="start" type="object">
+      Event start time
+
+      <Expandable title="Start Object">
+        <ResponseField name="dateTime" type="string">
+          Start time with timezone (ISO 8601)
+        </ResponseField>
+        
+        <ResponseField name="date" type="string">
+          All-day event date (YYYY-MM-DD)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="end" type="object">
+      Event end time
+
+      <Expandable title="End Object">
+        <ResponseField name="dateTime" type="string">
+          End time with timezone (ISO 8601)
+        </ResponseField>
+        
+        <ResponseField name="date" type="string">
+          All-day event end date (YYYY-MM-DD)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="id" type="string">
+      External event ID (optional, will be generated if not provided)
+    </ResponseField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="orgUnitId" type="string" required>
+  Organizational unit ID to assign meetings to
+  
+  **Example**: `"550e8400-e29b-41d4-a716-446655440000"`
+</ParamField>
+
+<ParamField body="channel" type="string">
+  Default meeting channel (`gmeet`, `zoom`, `teams`, `offline`)
+  
+  **Default**: `"gmeet"`
+</ParamField>
+
+<ParamField body="status" type="string">
+  Default meeting status (`scheduled`, `skip`, `in_progress`, `completed`, `error`)
+  
+  **Default**: `"scheduled"`
+</ParamField>
+
+## Response
+
+### Success Response
+
+<ResponseField name="success" type="boolean">
+  Success indicator: `true`
+</ResponseField>
+
+<ResponseField name="meetingIds" type="array">
+  Array of created meeting IDs
+
+  <Expandable title="Meeting ID Array">
+    <ResponseField name="[index]" type="string">
+      UUID of the created meeting
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Import Calendar Events
+
+<RequestExample>
+```bash cURL
+curl -X POST 'http://localhost:3001/api/v1/create-calendar' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer your_jwt_token_here' \
+  -d '{
+    "events": [
+      {
+        "summary": "Weekly Team Meeting",
+        "start": {
+          "dateTime": "2024-01-15T10:00:00.000Z"
+        },
+        "end": {
+          "dateTime": "2024-01-15T11:00:00.000Z"
+        },
+        "id": "cal-event-123"
+      },
+      {
+        "summary": "Project Review",
+        "start": {
+          "dateTime": "2024-01-16T14:00:00.000Z"
+        },
+        "end": {
+          "dateTime": "2024-01-16T15:30:00.000Z"
+        }
+      }
+    ],
+    "orgUnitId": "550e8400-e29b-41d4-a716-446655440000",
+    "channel": "gmeet",
+    "status": "scheduled"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/create-calendar', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer your_jwt_token_here'
+  },
+  body: JSON.stringify({
+    events: [
+      {
+        summary: 'Weekly Team Meeting',
+        start: {
+          dateTime: '2024-01-15T10:00:00.000Z'
+        },
+        end: {
+          dateTime: '2024-01-15T11:00:00.000Z'
+        },
+        id: 'cal-event-123'
+      }
+    ],
+    orgUnitId: '550e8400-e29b-41d4-a716-446655440000',
+    channel: 'gmeet',
+    status: 'scheduled'
+  })
+});
+
+const data = await response.json();
+
+if (data.success) {
+  console.log('Created meetings:', data.meetingIds);
+  console.log(`Successfully imported ${data.meetingIds.length} events`);
+}
+```
+
+```python Python
+import requests
+
+response = requests.post(
+  'http://localhost:3001/api/v1/create-calendar',
+  headers={
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer your_jwt_token_here'
+  },
+  json={
+    'events': [
+      {
+        'summary': 'Weekly Team Meeting',
+        'start': {
+          'dateTime': '2024-01-15T10:00:00.000Z'
+        },
+        'end': {
+          'dateTime': '2024-01-15T11:00:00.000Z'
+        },
+        'id': 'cal-event-123'
+      }
+    ],
+    'orgUnitId': '550e8400-e29b-41d4-a716-446655440000',
+    'channel': 'gmeet',
+    'status': 'scheduled'
+  }
+)
+
+data = response.json()
+
+if data.get('success'):
+  print(f"Created {len(data['meetingIds'])} meetings")
+  for meeting_id in data['meetingIds']:
+    print(f"Meeting ID: {meeting_id}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "success": true,
+  "meetingIds": [
+    "660e8400-e29b-41d4-a716-446655440001",
+    "770e8400-e29b-41d4-a716-446655440002"
+  ]
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="success" type="boolean">
+  Always `false` for error responses
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Unauthorized">
+```json
+{
+  "success": false,
+  "error": "Unauthorized"
+}
+```
+
+No valid authentication token provided.
+</Accordion>
+
+<Accordion title="400 - Missing Events">
+```json
+{
+  "success": false,
+  "error": "No events provided"
+}
+```
+
+The events array is empty or missing.
+</Accordion>
+
+<Accordion title="400 - Missing Org Unit ID">
+```json
+{
+  "success": false,
+  "error": "Missing orgUnitId"
+}
+```
+
+The orgUnitId parameter is required but not provided.
+</Accordion>
+
+<Accordion title="403 - Forbidden">
+```json
+{
+  "success": false,
+  "error": "Forbidden"
+}
+```
+
+User doesn't have permission to create meetings in the specified org unit.
+</Accordion>
+
+<Accordion title="400 - No Valid Events">
+```json
+{
+  "success": false,
+  "error": "No valid events to import"
+}
+```
+
+None of the provided events had valid start/end times.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "success": false,
+  "error": "Failed to import calendar events"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## Permission Requirements
+
+The user must have:
+- **meeting.create** permission for the specified organizational unit
+- Valid authentication token with enterprise context
+
+## Event Processing
+
+The endpoint processes events as follows:
+
+1. **Validation**: Validates event start and end times
+2. **Date Parsing**: Handles both datetime and date-only events
+3. **ID Generation**: Creates UUIDs for events without external IDs
+4. **Meeting Creation**: Creates meeting records with:
+   - Title from event summary
+   - Scheduled start/end times
+   - Specified channel and status
+   - Current user as host
+   - External meeting ID for reference
+
+## Date Handling
+
+- **DateTime Events**: Uses exact start/end times with timezone
+- **All-Day Events**: Converts to full-day ranges (00:00:00 to 23:59:59)
+- **Invalid Dates**: Events with invalid dates are skipped
+- **Missing Times**: Events without valid start/end times are rejected
+
+## Use Cases
+
+- **Calendar Import**: Import meetings from Google Calendar or other sources
+- **Bulk Meeting Creation**: Create multiple meetings at once
+- **External Integration**: Sync with external calendar systems
+- **Meeting Setup**: Initialize meetings from calendar events
+- **Migration**: Move meetings from other systems
+
+## Integration with Google Calendar
+
+This endpoint is commonly used with Google Calendar sync:
+1. Fetch events from Google Calendar API
+2. Transform events to the required format
+3. Call this endpoint to create meetings
+4. Track external meeting IDs for future syncs
+
+## Performance Considerations
+
+- Large batches of events may take time to process
+- Consider limiting batch size for better performance
+- Each event creates a separate database record
+- External IDs help prevent duplicate imports
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="List Meetings" icon="list" href="/api-reference/meetings/list">
+  View imported meetings
+</Card>
+
+<Card title="Create Meeting" icon="calendar-plus" href="/api-reference/meetings/create">
+  Create individual meetings
+</Card>
+
+<Card title="Google Calendar Sync" icon="sync" href="/api-reference/google/calendar-sync">
+  Sync with Google Calendar
+</Card>
+</CardGroup>

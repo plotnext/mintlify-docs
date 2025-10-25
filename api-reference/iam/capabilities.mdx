@@ -1,0 +1,322 @@
+---
+title: "Get User Capabilities"
+api: "GET /api/v1/iam/capabilities"
+description: "Get user's permissions and capabilities for the current enterprise"
+icon: "shield-check"
+---
+
+## Overview
+
+Retrieve the current user's capabilities and permissions within their enterprise context. This endpoint returns detailed information about what actions the user can perform based on their roles and organizational unit assignments.
+
+## Authentication
+
+<Info>
+This endpoint requires authentication via the `auth_token` cookie set during login.
+</Info>
+
+## Request
+
+This endpoint does not require any request body or parameters.
+
+## Response
+
+### Success Response
+
+<ResponseField name="scoped" type="object">
+  User's scoped capabilities and permissions
+
+  <Expandable title="Scoped Capabilities Object">
+    <ResponseField name="userId" type="string">
+      Current user's ID
+    </ResponseField>
+    
+    <ResponseField name="enterpriseId" type="string">
+      Current enterprise context
+    </ResponseField>
+    
+    <ResponseField name="roles" type="array">
+      List of user's roles in this enterprise
+
+      <Expandable title="Role Object">
+        <ResponseField name="id" type="string">
+          Role ID
+        </ResponseField>
+        
+        <ResponseField name="key" type="string">
+          Role key/name
+        </ResponseField>
+        
+        <ResponseField name="name" type="string">
+          Human-readable role name
+        </ResponseField>
+        
+        <ResponseField name="permissions" type="array">
+          List of permissions granted by this role
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="permissions" type="object">
+      Flattened permissions organized by resource and action
+
+      <Expandable title="Permissions Structure">
+        <ResponseField name="[resource]" type="object">
+          Permissions for a specific resource (e.g., "meeting", "org_unit")
+
+          <Expandable title="Resource Permissions">
+            <ResponseField name="[action]" type="array">
+              List of organizational units where this action is allowed
+              
+              **Example**: `["550e8400-e29b-41d4-a716-446655440000", "660e8400-e29b-41d4-a716-446655440001"]`
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="orgUnits" type="array">
+      Organizational units the user has access to
+
+      <Expandable title="Org Unit Object">
+        <ResponseField name="id" type="string">
+          Organizational unit ID
+        </ResponseField>
+        
+        <ResponseField name="name" type="string">
+          Organizational unit name
+        </ResponseField>
+        
+        <ResponseField name="type" type="string">
+          Organizational unit type (sales, cs, onboarding, exec)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="enterpriseId" type="string">
+  Current enterprise context (same as in scoped object)
+</ResponseField>
+
+## Examples
+
+### Get User Capabilities
+
+<RequestExample>
+```bash cURL
+curl -X GET 'http://localhost:3001/api/v1/iam/capabilities' \
+  -H 'Cookie: auth_token=your_jwt_token_here'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/iam/capabilities', {
+  method: 'GET',
+  credentials: 'include' // Include cookies
+});
+
+const data = await response.json();
+
+if (data.scoped) {
+  console.log('User capabilities:', data.scoped.permissions);
+  console.log('Available org units:', data.scoped.orgUnits);
+  console.log('User roles:', data.scoped.roles);
+}
+```
+
+```python Python
+import requests
+
+# Include the auth token cookie from your login response
+cookies = {'auth_token': 'your_jwt_token_here'}
+
+response = requests.get(
+  'http://localhost:3001/api/v1/iam/capabilities',
+  cookies=cookies
+)
+
+data = response.json()
+
+if data.get('scoped'):
+  print(f"User ID: {data['scoped']['userId']}")
+  print(f"Enterprise: {data['scoped']['enterpriseId']}")
+  print(f"Roles: {[role['name'] for role in data['scoped']['roles']]}")
+  print(f"Org Units: {[ou['name'] for ou in data['scoped']['orgUnits']]}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "scoped": {
+    "userId": "550e8400-e29b-41d4-a716-446655440000",
+    "enterpriseId": "660e8400-e29b-41d4-a716-446655440001",
+    "roles": [
+      {
+        "id": "770e8400-e29b-41d4-a716-446655440002",
+        "key": "manager",
+        "name": "Manager",
+        "permissions": [
+          "meeting.create",
+          "meeting.read",
+          "meeting.update",
+          "org_unit.read",
+          "user.read"
+        ]
+      }
+    ],
+    "permissions": {
+      "meeting": {
+        "create": ["880e8400-e29b-41d4-a716-446655440003"],
+        "read": ["880e8400-e29b-41d4-a716-446655440003", "990e8400-e29b-41d4-a716-446655440004"],
+        "update": ["880e8400-e29b-41d4-a716-446655440003"]
+      },
+      "org_unit": {
+        "read": ["880e8400-e29b-41d4-a716-446655440003", "990e8400-e29b-41d4-a716-446655440004"],
+        "create": ["880e8400-e29b-41d4-a716-446655440003"]
+      },
+      "user": {
+        "read": ["880e8400-e29b-41d4-a716-446655440003", "990e8400-e29b-41d4-a716-446655440004"]
+      }
+    },
+    "orgUnits": [
+      {
+        "id": "880e8400-e29b-41d4-a716-446655440003",
+        "name": "Sales Team",
+        "type": "sales"
+      },
+      {
+        "id": "990e8400-e29b-41d4-a716-446655440004",
+        "name": "Marketing Team",
+        "type": "sales"
+      }
+    ]
+  },
+  "enterpriseId": "660e8400-e29b-41d4-a716-446655440001"
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong
+</ResponseField>
+
+### Common Errors
+
+<AccordionGroup>
+<Accordion title="401 - Unauthorized">
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+No valid authentication token found or token is invalid.
+</Accordion>
+
+<Accordion title="500 - Server Error">
+```json
+{
+  "error": "Internal server error"
+}
+```
+</Accordion>
+</AccordionGroup>
+
+## Permission Structure
+
+The permissions object is organized hierarchically:
+
+```
+permissions: {
+  "resource": {           // e.g., "meeting", "org_unit", "user"
+    "action": [           // e.g., "create", "read", "update", "delete"
+      "orgUnitId1",       // Organizational units where action is allowed
+      "orgUnitId2",
+      "null"              // "null" means enterprise-wide permission
+    ]
+  }
+}
+```
+
+## Common Resources and Actions
+
+### Meeting Resource
+- **create**: Create new meetings
+- **read**: View meeting details
+- **update**: Modify existing meetings
+- **delete**: Remove meetings
+
+### Org Unit Resource
+- **read**: View organizational units
+- **create**: Create new organizational units
+- **update**: Modify organizational units
+- **delete**: Remove organizational units
+
+### User Resource
+- **read**: View user information
+- **create**: Create new users
+- **update**: Modify user information
+- **delete**: Remove users
+
+## Use Cases
+
+- **UI Permissions**: Show/hide UI elements based on user capabilities
+- **Feature Access**: Enable/disable features based on permissions
+- **Data Filtering**: Filter data based on organizational unit access
+- **Role Validation**: Verify user has required permissions for actions
+- **Audit Logging**: Track what users can do for compliance
+
+## Frontend Integration
+
+```javascript
+// Check if user can perform an action
+function canPerformAction(resource, action, orgUnitId = null) {
+  const permissions = data.scoped.permissions;
+  
+  if (!permissions[resource] || !permissions[resource][action]) {
+    return false;
+  }
+  
+  const allowedOrgUnits = permissions[resource][action];
+  
+  // Enterprise-wide permission
+  if (allowedOrgUnits.includes('null')) {
+    return true;
+  }
+  
+  // Org unit specific permission
+  if (orgUnitId && allowedOrgUnits.includes(orgUnitId)) {
+    return true;
+  }
+  
+  return false;
+}
+
+// Usage examples
+const canCreateMeetings = canPerformAction('meeting', 'create');
+const canReadOrgUnits = canPerformAction('org_unit', 'read');
+const canUpdateSalesTeam = canPerformAction('org_unit', 'update', 'sales-team-id');
+```
+
+## Security Considerations
+
+- Permissions are calculated server-side for security
+- JWT tokens contain minimal information
+- Capabilities are enterprise-scoped
+- Organizational unit access is enforced
+- No sensitive data is exposed in error messages
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+<Card title="Get Current User" icon="user" href="/api-reference/auth/me">
+  Get basic user information
+</Card>
+
+<Card title="List Roles" icon="users" href="/api-reference/org/roles">
+  Get available roles in the system
+</Card>
+</CardGroup>
