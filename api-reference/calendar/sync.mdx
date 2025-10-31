@@ -1,0 +1,222 @@
+---
+title: "Google Calendar Sync API"
+---
+
+# API Documentation: Google Calendar Sync API
+
+## POST /api/v1/calendar/sync
+
+### Description
+This endpoint triggers a sync between a user's Google Calendar and the system. It is responsible for:
+
+- Ensuring a webhook (watch) is configured so future changes are delivered.
+- Performing an incremental sync using a saved sync token if present, or a full sync when no token exists or the token has expired.
+- Upserting events (recurring and one-off) into the application's meetings/recurring meetings store.
+- Returning a summary snapshot including the next sync token.
+
+The request body is intentionally empty — the sync is driven by authenticated context and the user's webhook/watch state.
+
+### Request
+
+Headers:
+
+- `Authorization: Bearer <JWT>` (cookie-based auth may also be supported depending on your app)
+- `Content-Type: application/json`
+
+Body: {}
+
+### Response
+
+```json
+{
+  "ok": true,
+  "eventsSynced": 5,
+  "nextSyncToken": "nextSyncToken123",
+  "syncMode": "incremental",
+  "snapshot": {
+    "userId": "userId",
+    "enterpriseId": "enterpriseId",
+    "step": "done"
+  }
+}
+```
+
+Field descriptions:
+
+- `ok`: whether the operation succeeded
+- `eventsSynced`: number of events processed during this sync
+- `nextSyncToken`: token to use for the next incremental sync
+- `syncMode`: either `incremental` or `full`
+- `snapshot`: onboarding / processing snapshot useful for monitoring
+
+### Error Responses
+
+- 400 Bad Request: Google account not connected or token invalid.
+- 401 Unauthorized: Missing or invalid auth.
+- 500 Internal Server Error: Unexpected failures while contacting Google or processing events.
+
+---
+
+## Flow — POST /api/v1/calendar/sync
+
+1. Start → Extract auth from cookies or Authorization header
+2. Check if the user's Google account is connected
+   - No → Return 400 Bad Request (Google account not connected)
+   - Yes → Setup OAuth2 client and set credentials
+3. Ensure a watch (webhook) is registered with Google Calendar (call `channels/watch`)
+4. Look up any existing `syncToken` for the user's calendar resource
+   - If no token → run a full sync
+   - If token exists → attempt incremental sync
+5. If incremental sync fails because token expired → fall back to full sync
+6. Retrieve events according to chosen sync mode, then process events
+7. Persist new `syncToken`, channel ID, resource ID and webhook info
+8. Upsert series (recurring masters) and one-off events via meetings API
+9. Enqueue recurring meeting scans where applicable
+10. Return sync result with `nextSyncToken` and snapshot
+
+---
+
+## Sync Modes
+
+- Incremental sync: uses Google Calendar's `syncToken` to fetch only changed events since the last sync. Fast and preferred.
+- Full sync: retrieves all events for a configured window (for example, +/- 1 month) and is used when no valid `syncToken` exists or when the token is invalid/expired.
+
+When a sync token is expired, Google returns a 410 (Gone) and the implementation should switch to full sync and obtain a new token.
+
+---
+
+## Webhook Handling
+
+- The system should create a watch using the Google Calendar API `watch` endpoint and store the returned `channelId`, `resourceId`, and expiration alongside the `syncToken`.
+- When a webhook notification arrives, it may be a lightweight ping (no payload). The system should call the `/calendar/sync` endpoint (or an internal sync handler) to reconcile changes for the affected resource.
+
+Security notes:
+
+- Verify webhook channel tokens or resource identifiers to avoid accepting forged notifications.
+- Rotate or renew watches before they expire.
+
+---
+
+## Helper functions and examples
+
+Below are two helper functions commonly used by the sync implementation. Include or adapt them in your service layer.
+
+### inferChannelFromJoinUrl
+
+Identifies the meeting platform from a join URL.
+
+```ts
+function inferChannelFromJoinUrl(url?: string | null): "gmeet" | "zoom" | "teams" | "offline" {
+  if (!url) return "offline";
+  const u = url.toLowerCase();
+  if (u.includes("meet.google.com")) return "gmeet";
+  if (u.includes("zoom.us")) return "zoom";
+  if (u.includes("teams.microsoft")) return "teams";
+  return "offline";
+}
+```
+
+### upsertInitialEvents
+
+Processes arrays of Google Calendar events and upserts recurring masters and one-off events into the meetings system, enqueuing scans for recurring series where needed.
+
+```ts
+async function upsertInitialEvents(
+  items: calendar_v3.Schema$Event[],
+  userId: string,
+  enterpriseId: string,
+  resourceId: string
+) {
+  if (!items?.length) return;
+
+  // Load user + org unit (ensure you adapt to your DB layer)
+  // Build an auth token to call internal meetings API
+
+  const meetingsApiUrl = process.env.MEETING_API_URL || "https://www.arali.xyz/api/v1/meetings";
+
+  const seriesMasters: calendar_v3.Schema$Event[] = [];
+  const oneOffEvents: calendar_v3.Schema$Event[] = [];
+
+  for (const ev of items) {
+    if (!ev) continue;
+    const isSeriesMaster = Array.isArray(ev.recurrence) && ev.recurrence.length > 0 && !ev.recurringEventId;
+    if (isSeriesMaster) {
+      seriesMasters.push(ev);
+      continue;
+    } else {
+      if (ev.recurringEventId) continue; // skip exceptions/instances here
+      oneOffEvents.push(ev);
+    }
+  }
+
+  // Upsert recurring series masters
+  for (const ev of seriesMasters) {
+    const status: "cancelled" | "active" = ev.status === "cancelled" ? "cancelled" : "active";
+    const dataToUpsert = {
+      name: ev.summary ?? "Recurring Meeting",
+      recurringMeetingId: ev.id!,
+      resourceId,
+      lastSync: null,
+      status,
+      updatedAt: new Date(),
+    };
+
+    // Use your DB layer to upsert `recurringMeetings` and enqueue scans as shown in the example in project code.
+  }
+
+  // Upsert one-off events by calling the meetings API for each event
+  for (const ev of oneOffEvents) {
+    const isDeleted = ev.status === "cancelled";
+    const startIso = ev.start?.dateTime ?? (ev.start?.date ? `${ev.start.date}T00:00:00.000Z` : null);
+    const endIso = ev.end?.dateTime ?? (ev.end?.date ? `${ev.end.date}T23:59:59.999Z` : null);
+    if (!startIso || !endIso) continue;
+
+    const joinUrl = ev.hangoutLink || ev.conferenceData?.entryPoints?.find((p) => p.entryPointType === "video")?.uri || null;
+
+    const channel = inferChannelFromJoinUrl(joinUrl);
+    const status = isDeleted ? "cancelled" : "scheduled";
+
+    const payload = {
+      title: ev.summary ?? "(no title)",
+      channel,
+      join_url: joinUrl,
+      scheduled_start_at: startIso,
+      scheduled_end_at: endIso,
+      status,
+      host_user_id: userId,
+      external_meeting_id: ev.id ?? null,
+      recurring_meeting_id: ev.recurringEventId ?? null,
+      metadata: ev,
+    };
+
+    // POST to meetings API with appropriate auth
+    // If response is not ok, log and continue
+  }
+}
+```
+
+---
+
+## Implementation notes & best practices
+
+- Persist `channelId`, `resourceId`, and `syncToken` per calendar resource to support watches and incremental syncs.
+- Respect Google API quotas and use exponential backoff on 429 responses.
+- Validate and normalize timestamps to ISO-8601 UTC before upserting to the meetings API.
+- Use idempotent upserts (by `external_meeting_id` or `recurringMeetingId`) so repeated notifications or retries don't produce duplicates.
+- Monitor webhook expiration and renew the watch in advance of expiry.
+
+## Troubleshooting
+
+- 400 / Google account not connected: confirm the user connected Google and that OAuth tokens are present and valid.
+- Incremental sync returns 410 (Gone): token expired — trigger full sync and store new sync token.
+- Missing events after sync: verify the sync window for full sync is large enough to include the desired events.
+
+---
+
+If you'd like, I can:
+
+- Add this page to `docs.json` under the `Meetings` or `Calendar` group so it shows up in the sidebar.
+- Convert the flow into an SVG diagram and embed it.
+- Add concrete code snippets for the Google Calendar watch/list APIs with Node/Google client examples.
+
+Tell me which of those you'd like next.

@@ -1,0 +1,56 @@
+---
+title: "Metadata Analysis Handler"
+---
+
+# Metadata Analysis Handler Documentation
+
+This API handler fetches meeting transcripts and analyzes them using ChatGPT/OpenAI to extract key metrics, insights, and action items.
+
+### **Required Environment Variables:**
+- `OPENAI_API_KEY`: Your OpenAI API key (required for analysis).
+- `OPENAI_BASE_URL`: OpenAI API base URL (optional, defaults to 'https://api.openai.com/v1').
+- `OPENAI_MODEL`: Model to use for analysis (optional, defaults to 'gpt-4o-mini').
+
+### **Metrics Extracted:**
+- **Engagement Score** (0-100)
+- **Meeting Effectiveness** (0-100)
+- **Key Topics**
+- **Action Items**
+- **Key Decisions**
+- **Sentiment Analysis**
+- **Speaking Time Distribution**
+- **Meeting Summary**
+
+## **API Flowchart**
+
+```mermaid
+flowchart TD
+  A[Start] --> B[Job Registration: metadata.analyze]
+  
+  B --> C[Fetch Active Metrics from DB]
+  C --> D{Metrics Found?}
+  D -- No --> E[Exit Job]
+  D -- Yes --> F[Build Combined Prompt]
+  
+  F --> G[Fetch Transcript from Database]
+  G --> H{Transcript Found?}
+  H -- No --> I[Exit Job - Missing Transcript]
+  H -- Yes --> J[Send Transcript to ChatGPT for Analysis]
+  
+  J --> K{Analysis Result Available?}
+  K -- No --> L[Exit Job - Failed to Analyze]
+  K -- Yes --> M[Store Analysis in DB]
+  
+  M --> N[Log and Complete Job]
+  N --> O[End Job]
+
+  E --> O
+  I --> O
+  L --> O
+  
+  style A fill:#f9f,stroke:#333,stroke-width:4px;
+  style E fill:#f99,stroke:#333,stroke-width:2px;
+  style O fill:#9f9,stroke:#333,stroke-width:2px;
+  style G fill:#f9f,stroke:#333,stroke-width:2px;
+  style L fill:#f99,stroke:#333,stroke-width:2px;
+  style N fill:#9f9,stroke:#333,stroke-width:2px;

@@ -1,0 +1,57 @@
+---
+title: "Calendar Webhook Handler"
+---
+
+# Calendar Webhook Handler Documentation
+
+This handler processes incoming calendar webhooks, validates the request, and manages the synchronization of calendar events with the system. It also handles re-authentication for expired tokens and ensures that meeting events are up-to-date.
+
+### **Required Environment Variables:**
+- `GOOGLE_CLIENT_ID`: Google OAuth client ID.
+- `GOOGLE_CLIENT_SECRET`: Google OAuth client secret.
+- `RESEND_API_KEY`: API key for sending emails to users for re-authentication.
+- `MEETING_API_URL`: The endpoint for the meetings API (optional, defaults to 'https://www.arali.xyz/api/v1/meetings').
+
+### **Key Features:**
+- Handles the **OAuth token refresh** process for expired or revoked tokens.
+- Synchronizes events from **Google Calendar** with the internal system.
+- Sends email notifications to users when their calendar connection needs to be re-established.
+
+## **API Flowchart**
+
+```mermaid
+flowchart TD
+  A[Start] --> B[Incoming Webhook Request]
+
+  B --> C[Validate Channel and Resource ID]
+  C --> D{Channel and Resource IDs Present?}
+  D -->|No| E[Return 400: Missing Channel/Resource ID]
+  D -->|Yes| F[Fetch Webhook + User Data]
+
+  F --> G{User Data Found?}
+  G -->|No| H[Return 404: Unknown Channel/Resource or Missing User Data]
+  G -->|Yes| I[Validate Token]
+
+  I --> J{Token Mismatch?}
+  J -->|Yes| K[Return 403: Token Mismatch]
+  J -->|No| L[Fetch OAuth Tokens]
+
+  L --> M[Build Google OAuth Client]
+  M --> N[Choose Sync Strategy]
+
+  N --> O{Sync Token Available?}
+  O -->|No| P[Full Sync Events]
+  O -->|Yes| Q[Delta Sync Events]
+
+  P --> R[Persist Refreshed Token]
+  Q --> R[Persist Refreshed Token]
+
+  R --> S[Upsert Events via Meetings API]
+
+  S --> T[Log Success and Return 200]
+
+  E --> T
+  H --> T
+  K --> T
+  R --> T
+  style T fill:#9f9,stroke:#333,stroke-width:2px;

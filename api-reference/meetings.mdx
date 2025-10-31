@@ -1,0 +1,167 @@
+---
+title: "Meetings API"
+---
+
+# API Documentation: Meetings API
+
+## POST /api/v1/meetings
+### Description
+This endpoint allows you to **create** or **update** a meeting. When creating a new meeting, all the necessary details such as meeting title, scheduled start time, participant emails, and other metadata are provided. If updating an existing meeting, the meeting is identified using the `external_meeting_id`.
+
+### Request Body
+
+```json
+{
+  "title": "Meeting Title",
+  "channel": "gmeet",  // Channel type: "gmeet", "zoom", "teams", or "offline"
+  "join_url": "https://example.com/join",
+  "scheduled_start_at": "2025-10-29T10:00:00Z",
+  "scheduled_end_at": "2025-10-29T11:00:00Z",
+  "status": "scheduled",  // Allowed statuses: "scheduled", "skip", "in_progress", "cancelled", "completed", "deleted", "error"
+  "host_user_id": "user_id",
+  "host_email": "host@example.com",
+  "external_meeting_id": "123456",
+  "metadata": {
+    "organizer": {
+      "email": "organizer@example.com"
+    }
+  },
+  "participant_emails": ["participant@example.com"],
+  "recurring_meeting_id": "recurring_id",
+  "type": "internal"  // Meeting type: "internal" or "external"
+}
+```
+
+### Response
+
+```json
+{
+  "meeting": {
+    "id": "meeting_id",
+    "title": "Meeting Title",
+    "channel": "gmeet",
+    "join_url": "https://example.com/join",
+    "scheduled_start_at": "2025-10-29T10:00:00Z",
+    "scheduled_end_at": "2025-10-29T11:00:00Z",
+    "status": "scheduled",
+    "host_user_id": "user_id",
+    "host_email": "host@example.com"
+  },
+  "botSession": {
+    "id": "bot_session_id",
+    "state": "created"
+  },
+  "participants": [
+    {
+      "id": "participant_id",
+      "email_id": "participant@example.com",
+      "display_name": "Participant Name"
+    }
+  ]
+}
+```
+
+### Error Responses
+
+- 400 Bad Request: If required fields are missing or invalid (e.g., missing scheduled_start_at, invalid status, etc.)
+- 403 Forbidden: If the user does not have permission to create or update the meeting.
+- 500 Internal Server Error: If an unexpected error occurs during processing.
+
+---
+
+## GET /api/v1/meetings
+
+### Description
+This endpoint retrieves meetings based on the provided filters such as enterprise_id, participant_id, and time intervals. It supports pagination, showing upcoming meetings, and filtering by participant.
+
+### Query Parameters
+
+- enterprise_id: The ID of the enterprise (required).
+- participant_id: The ID of a participant to filter the meetings (optional).
+- interval: Time interval to filter meetings (e.g., 7 days, 1 month).
+- page: The page number for pagination (default: 1).
+- limit: The number of meetings to retrieve per page (default: 20, max: 100).
+- show_upcoming: Whether to show upcoming meetings (true or false).
+- participant_only: If true, only meetings where the user is a participant are returned.
+
+### Response
+
+```json
+{
+  "meetings": [
+    {
+      "id": "meeting_id",
+      "title": "Meeting Title",
+      "status": "scheduled",
+      "scheduled_start_at": "2025-10-29T10:00:00Z",
+      "scheduled_end_at": "2025-10-29T11:00:00Z",
+      "channel": "gmeet",
+      "join_url": "https://example.com/join",
+      "participants": [
+        {
+          "id": "participant_id",
+          "email_id": "participant@example.com",
+          "display_name": "Participant Name"
+        }
+      ]
+    }
+  ],
+  "total": 100,
+  "page": 1,
+  "limit": 20,
+  "hasMore": true
+}
+```
+
+### Error Responses
+
+- 400 Bad Request: If enterprise_id is missing or invalid.
+- 403 Forbidden: If the user does not have permission to read the meeting.
+- 500 Internal Server Error: If an unexpected error occurs during retrieval.
+
+---
+
+## Flowcharts
+
+### POST Request Flow
+
+1. Start → Validate JWT Token
+2. Validate JWT Token → Check Permission for Meeting Creation
+3. Check Permission → Is Permission Granted?
+   - No → Return 403 Forbidden
+   - Yes → Process Meeting Data
+4. Process Meeting Data → Is New Meeting or Update?
+   - New → Insert New Meeting into DB
+   - Update → Update Existing Meeting
+5. Insert New Meeting / Update Meeting → Process Participants
+6. Process Participants → Create or Update Bot Session
+7. Create or Update Bot Session → Enqueue Job if Meeting is Not Cancelled
+8. Enqueue Job → Return Meeting Data, Participants, Bot Session
+9. End
+
+### GET Request Flow
+
+1. Start → Parse GET Request Parameters
+2. Parse GET Request Parameters → Extract Filters (Enterprise ID, Participant ID, Interval, etc.)
+3. Extract Filters → Validate Permissions for GET Request
+4. Validate Permissions → Is Permission Granted for Read?
+   - No → Return 403 Forbidden
+   - Yes → Fetch Meetings from DB Based on Filters
+5. Fetch Meetings from DB → Apply Filters: Enterprise ID, Participant ID, Interval, Org Units
+6. Apply Filters → Paginate Results
+7. Paginate Results → Return Meetings, Pagination, Total Count
+8. End
+
+---
+
+## Usage in Mintlify
+
+To use this documentation in your Mintlify project, copy or move this file into the `api-reference` folder (already placed here). It provides structured documentation for developers working with the Meetings API, including request/response examples, error codes, and flowcharts describing the request handling flow.
+
+If you'd like, I can also:
+
+- Add a link to this page from the main `index.mdx` or navigation.
+- Convert the flowcharts into SVG diagrams and embed them.
+- Add OpenAPI-compatible schema snippets.
+
+Let me know which of the above you'd like next.

@@ -1,0 +1,59 @@
+---
+title: "Recurring Meeting Sync API"
+---
+
+# Recurring Meeting Sync API Documentation
+
+This API handles the synchronization of recurring Google Calendar events for a user. It supports both **scan** and **sync** operations to keep recurring meetings up-to-date in your system.
+
+## Job Registration
+
+The recurring job handler (`recurring.meetings.scan` and `recurring.meetings.sync`) is responsible for periodically checking and syncing recurring events from Google Calendar.
+
+## Job Flow
+
+The flow for processing recurring meetings involves two main jobs:
+1. **Recurring Scan Job (`recurring.meetings.scan`)** — Identifies rows in the database that need to be synced.
+2. **Recurring Sync Job (`recurring.meetings.sync`)** — Fetches the recurring event instances from Google Calendar and posts them to your system.
+
+---
+
+## API Flowchart
+
+```mermaid
+graph TD
+  A[Start] --> B[Job Registration: recurring.meetings.scan & recurring.meetings.sync]
+
+  B --> C[Recurring Scan Job: Fetch Rows Needing Sync]
+  C --> D{Rows Found?}
+  D -- No --> E[Exit Scan Job]
+  D -- Yes --> F[Process Each Row: Resolve User and Calendar]
+  
+  F --> G{User & Calendar Found?}
+  G -- No --> H["Skip Row (Error Resolving User/Calendar)"]
+  G -- Yes --> I[Enqueue Recurring Sync Job for Each Row]
+  
+  I --> J[Recurring Sync Job: Fetch Event Instances]
+  J --> K[Fetch Events for Recurring Master Event ID]
+  
+  K --> L[Sync Events in 7-day Window]
+  L --> M["Process Each Event (Upsert to Meetings API)"]
+  
+  M --> N[Mark Last Sync Time for Recurring Meeting]
+  N --> O[End Sync Job]
+
+  E --> O
+  H --> O
+  
+  subgraph Recurring Sync Flow
+    J --> P[Get OAuth Client for User]
+    P --> Q[Fetch Recurring Event Instances from Google Calendar]
+    Q --> R[Post Event Instance to Meetings API]
+    R --> S[Log Success or Failure for Event]
+  end
+  
+  style A fill:#f9f,stroke:#333,stroke-width:4px;
+  style E fill:#f99,stroke:#333,stroke-width:2px;
+  style O fill:#9f9,stroke:#333,stroke-width:2px;
+  style H fill:#f99,stroke:#333,stroke-width:2px;
+  style R fill:#f9f,stroke:#333,stroke-width:2px;

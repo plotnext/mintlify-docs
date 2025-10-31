@@ -8,13 +8,7 @@
     "dark": "#15803D"
   },
   "favicon": "/favicon.svg",
-  "api": {
-    "baseUrl": "http://localhost:3001",
-    "auth": {
-      "method": "bearer",
-      "type": "http"
-    }
-  },
+  
   "navigation": {
     "tabs": [
       {
@@ -43,6 +37,21 @@
               "rbac-scoping",
               "rbac-database",
               "rbac-troubleshooting"
+            ]
+          }
+          ,
+          {
+            "group": "pg-boss",
+            "pages": [
+              "pg-boss/recurring.meeting",
+              "pg-boss/renew.webhook",
+              "pg-boss/meeting.analysis"
+            ]
+          },
+          {
+            "group": "backend",
+            "pages": [
+              "webhookCode"
             ]
           }
         ]
@@ -92,13 +101,16 @@
               "api-reference/meetings/get",
               "api-reference/meetings/participants",
               "api-reference/meetings/transcript",
-              "api-reference/meetings/recording"
+              "api-reference/meetings/recording",
+              "api-reference/meetings",
+              "api-reference/meetings-guide"
             ]
           },
           {
             "group": "Calendar",
             "pages": [
-              "api-reference/calendar/create"
+              "api-reference/calendar/create",
+              "api-reference/calendar/sync"
             ]
           },
           {

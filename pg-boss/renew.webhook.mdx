@@ -1,0 +1,51 @@
+---
+title: "Calendar Webhook Renewal API"
+---
+
+# Calendar Webhook Renewal API Documentation
+
+This API handles the renewal process of Google Calendar webhooks for users. It consists of two main jobs:
+1. **`calendar.webhook.renew.scan`** — Scans for active webhooks that are nearing expiration.
+2. **`calendar.webhook.renew.run`** — Renews the webhook, creating a new watch and stopping the old one.
+
+## Job Flow
+
+The flow for processing webhook renewal includes the following steps:
+
+1. **Scan Job** (`calendar.webhook.renew.scan`):
+   - Identifies and selects webhooks that are about to expire within the next 1-2 days.
+   - Enqueues a renewal job for each found webhook.
+
+2. **Renew Job** (`calendar.webhook.renew.run`):
+   - Creates a new Google Calendar watch for the user's calendar.
+   - Stops the old webhook (best effort).
+   - Updates the database with the new webhook details.
+   - Logs all actions (success or failure).
+
+---
+
+## API Flowchart
+
+```mermaid
+graph TD
+  A[Start] --> B["Job Registration: calendar.webhook.renew.scan & calendar.webhook.renew.run"]
+
+  B --> C[Scanner Job: Fetch Expiring Webhooks]
+  C --> D{Rows Found?}
+  D -- No --> E[Exit Scan Job]
+  D -- Yes --> F[Enqueue Renew Job for Each Row]
+  
+  F --> G[Renew Job: Fetch Webhook Data]
+  G --> H[Create New Watch on Google Calendar]
+  H --> I["Stop Old Channel (Best Effort)"]
+  I --> J[Update Database with New Webhook Details]
+  J --> K[Log Success or Failure]
+  K --> L[End Sync Job]
+
+  E --> L
+  
+  style A fill:#f9f,stroke:#333,stroke-width:4px;
+  style E fill:#f99,stroke:#333,stroke-width:2px;
+  style L fill:#9f9,stroke:#333,stroke-width:2px;
+  style G fill:#f9f,stroke:#333,stroke-width:2px;
+  style K fill:#f9f,stroke:#333,stroke-width:2px;

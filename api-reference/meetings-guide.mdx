@@ -1,0 +1,235 @@
+---
+title: "Meetings API Guide"
+---
+
+# Meetings API — Guide and Examples
+
+This guide explains how to use the Meetings API (create/update via POST and list via GET). It includes practical examples (curl, Node, Python), authentication notes, common error handling, pagination, and best practices.
+
+## Quick contract
+
+- Base path: `/api/v1/meetings`
+- Auth: Bearer JWT in `Authorization` header
+- Content type: `application/json`
+- Responses: JSON objects with `meeting` or `meetings` as shown in the API reference
+
+## Authentication
+
+All requests must include a valid JWT in the `Authorization` header:
+
+```
+Authorization: Bearer <JWT_TOKEN>
+```
+
+If the token is missing or invalid the API will return `401 Unauthorized` or `403 Forbidden` depending on the auth layer.
+
+## POST /api/v1/meetings — Create or update a meeting
+
+Purpose: create a new meeting or update an existing meeting identified by `external_meeting_id`.
+
+Headers:
+
+- `Authorization: Bearer <token>`
+- `Content-Type: application/json`
+
+Minimal required body (example):
+
+```json
+{
+  "title": "Biweekly Sync",
+  "channel": "gmeet",
+  "scheduled_start_at": "2025-10-29T10:00:00Z",
+  "scheduled_end_at": "2025-10-29T11:00:00Z",
+  "host_email": "host@example.com",
+  "participant_emails": ["alice@example.com", "bob@example.com"]
+}
+```
+
+Idempotency and update flow:
+
+- If `external_meeting_id` is provided and matches an existing meeting, the endpoint updates that meeting.
+- If `external_meeting_id` is not provided or doesn't match, a new meeting is created.
+
+When to enqueue background jobs and bot sessions:
+
+- The API creates or updates a `botSession` to manage in-call bot state.
+- If a meeting is not cancelled, a background job may be enqueued to handle invites, transcripts, or recordings.
+
+Example: curl (create)
+
+```bash
+curl -X POST "https://api.example.com/api/v1/meetings" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Project Kickoff",
+    "channel": "zoom",
+    "join_url": "https://zoom.us/j/123456",
+    "scheduled_start_at": "2025-11-01T15:00:00Z",
+    "scheduled_end_at": "2025-11-01T16:00:00Z",
+    "host_email": "host@example.com",
+    "participant_emails": ["alice@example.com"]
+  }'
+```
+
+Example: Node (fetch)
+
+```js
+const fetch = require('node-fetch');
+
+async function createMeeting(token, body) {
+  const res = await fetch('https://api.example.com/api/v1/meetings', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// Usage
+// createMeeting(process.env.TOKEN, {...}).then(console.log).catch(console.error)
+```
+
+Example: Python (requests)
+
+```py
+import requests
+
+def create_meeting(token, payload):
+    headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+    r = requests.post('https://api.example.com/api/v1/meetings', json=payload, headers=headers)
+    r.raise_for_status()
+    return r.json()
+
+# create_meeting(TOKEN, payload)
+```
+
+Error handling (POST)
+
+- 400 Bad Request — missing required fields, invalid timestamps or invalid status value
+- 403 Forbidden — user not permitted to create/update meetings
+- 500 Internal Server Error — transient server issue
+
+Tip: validate dates to ISO 8601 (UTC recommended) before sending.
+
+## GET /api/v1/meetings — List meetings
+
+Purpose: retrieve meetings using filters, with pagination.
+
+Common query parameters:
+
+- `enterprise_id` (required)
+- `participant_id` (optional)
+- `interval` (e.g., `7d`, `30d`) or explicit `from`/`to` timestamps
+- `page` (default: 1)
+- `limit` (default: 20, max: 100)
+- `show_upcoming` (true/false)
+- `participant_only` (true/false)
+
+Example: curl (list upcoming meetings for an enterprise)
+
+```bash
+curl "https://api.example.com/api/v1/meetings?enterprise_id=ent_123&show_upcoming=true&page=1&limit=20" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Example: Node (list)
+
+```js
+async function listMeetings(token, params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`https://api.example.com/api/v1/meetings?${qs}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+```
+
+Pagination notes
+
+- The response contains `page`, `limit`, `total`, and `hasMore`.
+- Use `page` + `limit` to walk results. For high-volume queries prefer server-side cursors if the API exposes them.
+
+Filtering and performance
+
+- Filter by `participant_id` to reduce payload size if you only need meetings for one person.
+- Use `interval` or `from`/`to` to avoid scanning large date ranges.
+
+Error handling (GET)
+
+- 400 Bad Request — missing/invalid `enterprise_id` or malformed query parameter
+- 403 Forbidden — user not permitted to read
+- 500 Internal Server Error — transient server issue
+
+## Participants, Bot Sessions and Background Jobs
+
+- Participant records in responses include `id`, `email_id`, and `display_name`.
+- A `botSession` object is returned for meetings managed by the in-call bot. It will have `id` and `state` (e.g., `created`, `active`).
+- Jobs for processing (invites, recording, transcripts) are enqueued if meeting state requires it (not cancelled).
+
+If your integration needs to track processing, subscribe to your platform's job or webhook events for status updates.
+
+## Best Practices
+
+- Validate inputs locally (timestamps, emails, allowed `status` values) to reduce 400 responses.
+- Use a consistent `external_meeting_id` from your system when creating meetings so retrying or updating is safe.
+- Respect rate limits — if you receive 429, back off and retry with exponential backoff.
+- For bulk updates, batch requests on your side where possible — but avoid large single requests that might time out.
+
+## Troubleshooting
+
+- 400 errors: confirm JSON body, required fields, timestamp formats, and status enum.
+- 403 errors: verify you use the correct enterprise context and that the token maps to a user with the necessary role/capabilities.
+- 500 errors: retry with backoff and log the full request ID (if returned) to correlate with server logs.
+
+## Optional next steps I can add
+
+- Add direct links from `index.mdx` to this guide and the `meetings.mdx` reference page.
+- Convert the flowcharts into visual SVGs and embed them in the guide.
+- Add OpenAPI snippets or JSON Schema examples for request validation.
+
+If you want, I can add a link to this guide in `index.mdx` now — tell me where in the navigation you'd like it to appear.
+
+
+```mermaid
+graph TD
+  A[Start] --> B[POST Request: Validate JWT Token]
+  A --> O[GET Request: Parse GET Request Parameters]
+
+  B --> C[Check Permission for Meeting Create]
+  C --> D{Is Permission Granted?}
+  D -- No --> E[Return 403 Forbidden]
+  D -- Yes --> F[Process POST Meeting Data]
+  
+  F --> G{Is New Meeting or Update?}
+  G -- New --> H[Insert New Meeting into DB]
+  G -- Update --> I[Update Existing Meeting]
+  
+  H --> J[Process Participants for New Meeting]
+  I --> J[Process Participants for Existing Meeting]
+  
+  J --> K[Create or Update Bot Session]
+  K --> L[Enqueue Job if Meeting is Not Cancelled]
+  L --> M[Return Meeting Data, Participants, Bot Session]
+  M --> N[End]
+  
+  O --> P[Extract GET Request Filters]
+  P --> Q[Validate Permissions for GET Request]
+  Q --> R{Is Permission Granted for Read?}
+  R -- No --> S[Return 403 Forbidden]
+  R -- Yes --> T[Fetch Meetings from DB Based on Filters]
+  
+  T --> U[Apply Filters: Enterprise ID, Participant ID, Interval, Org Units]
+  U --> V[Paginate Results]
+  V --> W[Return Meetings, Pagination, Total Count]
+  W --> N[End]
+
+  style A fill:#f9f,stroke:#333,stroke-width:4px;
+  style E fill:#f99,stroke:#333,stroke-width:2px;
+  style S fill:#f99,stroke:#333,stroke-width:2px;
