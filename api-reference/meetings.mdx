@@ -5,7 +5,9 @@ title: "Meetings API"
 # API Documentation: Meetings API
 
 ## POST /api/v1/meetings
+
 ### Description
+
 This endpoint allows you to **create** or **update** a meeting. When creating a new meeting, all the necessary details such as meeting title, scheduled start time, participant emails, and other metadata are provided. If updating an existing meeting, the meeting is identified using the `external_meeting_id`.
 
 ### Request Body
@@ -13,11 +15,11 @@ This endpoint allows you to **create** or **update** a meeting. When creating a 
 ```json
 {
   "title": "Meeting Title",
-  "channel": "gmeet",  // Channel type: "gmeet", "zoom", "teams", or "offline"
+  "channel": "gmeet", // Channel type: "gmeet", "zoom", "teams", or "offline"
   "join_url": "https://example.com/join",
   "scheduled_start_at": "2025-10-29T10:00:00Z",
   "scheduled_end_at": "2025-10-29T11:00:00Z",
-  "status": "scheduled",  // Allowed statuses: "scheduled", "skip", "in_progress", "cancelled", "completed", "deleted", "error"
+  "status": "scheduled", // Allowed statuses: "scheduled", "skip", "in_progress", "cancelled", "completed", "deleted", "error"
   "host_user_id": "user_id",
   "host_email": "host@example.com",
   "external_meeting_id": "123456",
@@ -28,7 +30,7 @@ This endpoint allows you to **create** or **update** a meeting. When creating a 
   },
   "participant_emails": ["participant@example.com"],
   "recurring_meeting_id": "recurring_id",
-  "type": "internal"  // Meeting type: "internal" or "external"
+  "type": "internal" // Meeting type: "internal" or "external"
 }
 ```
 
@@ -72,6 +74,7 @@ This endpoint allows you to **create** or **update** a meeting. When creating a 
 ## GET /api/v1/meetings
 
 ### Description
+
 This endpoint retrieves meetings based on the provided filters such as enterprise_id, participant_id, and time intervals. It supports pagination, showing upcoming meetings, and filtering by participant.
 
 ### Query Parameters

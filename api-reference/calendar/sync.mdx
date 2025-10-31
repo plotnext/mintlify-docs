@@ -7,6 +7,7 @@ title: "Google Calendar Sync API"
 ## POST /api/v1/calendar/sync
 
 ### Description
+
 This endpoint triggers a sync between a user's Google Calendar and the system. It is responsible for:
 
 - Ensuring a webhook (watch) is configured so future changes are delivered.
@@ -106,7 +107,9 @@ Below are two helper functions commonly used by the sync implementation. Include
 Identifies the meeting platform from a join URL.
 
 ```ts
-function inferChannelFromJoinUrl(url?: string | null): "gmeet" | "zoom" | "teams" | "offline" {
+function inferChannelFromJoinUrl(
+  url?: string | null
+): "gmeet" | "zoom" | "teams" | "offline" {
   if (!url) return "offline";
   const u = url.toLowerCase();
   if (u.includes("meet.google.com")) return "gmeet";
@@ -132,14 +135,18 @@ async function upsertInitialEvents(
   // Load user + org unit (ensure you adapt to your DB layer)
   // Build an auth token to call internal meetings API
 
-  const meetingsApiUrl = process.env.MEETING_API_URL || "https://www.arali.xyz/api/v1/meetings";
+  const meetingsApiUrl =
+    process.env.MEETING_API_URL || "https://www.arali.xyz/api/v1/meetings";
 
   const seriesMasters: calendar_v3.Schema$Event[] = [];
   const oneOffEvents: calendar_v3.Schema$Event[] = [];
 
   for (const ev of items) {
     if (!ev) continue;
-    const isSeriesMaster = Array.isArray(ev.recurrence) && ev.recurrence.length > 0 && !ev.recurringEventId;
+    const isSeriesMaster =
+      Array.isArray(ev.recurrence) &&
+      ev.recurrence.length > 0 &&
+      !ev.recurringEventId;
     if (isSeriesMaster) {
       seriesMasters.push(ev);
       continue;
@@ -151,7 +158,8 @@ async function upsertInitialEvents(
 
   // Upsert recurring series masters
   for (const ev of seriesMasters) {
-    const status: "cancelled" | "active" = ev.status === "cancelled" ? "cancelled" : "active";
+    const status: "cancelled" | "active" =
+      ev.status === "cancelled" ? "cancelled" : "active";
     const dataToUpsert = {
       name: ev.summary ?? "Recurring Meeting",
       recurringMeetingId: ev.id!,
@@ -167,11 +175,19 @@ async function upsertInitialEvents(
   // Upsert one-off events by calling the meetings API for each event
   for (const ev of oneOffEvents) {
     const isDeleted = ev.status === "cancelled";
-    const startIso = ev.start?.dateTime ?? (ev.start?.date ? `${ev.start.date}T00:00:00.000Z` : null);
-    const endIso = ev.end?.dateTime ?? (ev.end?.date ? `${ev.end.date}T23:59:59.999Z` : null);
+    const startIso =
+      ev.start?.dateTime ??
+      (ev.start?.date ? `${ev.start.date}T00:00:00.000Z` : null);
+    const endIso =
+      ev.end?.dateTime ??
+      (ev.end?.date ? `${ev.end.date}T23:59:59.999Z` : null);
     if (!startIso || !endIso) continue;
 
-    const joinUrl = ev.hangoutLink || ev.conferenceData?.entryPoints?.find((p) => p.entryPointType === "video")?.uri || null;
+    const joinUrl =
+      ev.hangoutLink ||
+      ev.conferenceData?.entryPoints?.find((p) => p.entryPointType === "video")
+        ?.uri ||
+      null;
 
     const channel = inferChannelFromJoinUrl(joinUrl);
     const status = isDeleted ? "cancelled" : "scheduled";
